@@ -35,7 +35,7 @@ function Dashboard() {
   useEffect(() => { 
     if (!token) navigate('/');
     else fetchStudents(); 
-  }, [navigate, token]);
+  }, [navigate, token, fetchStudents]);
 
   // 🚀 Photo ko base64 code mein badalne ka function
   const handlePhotoChange = (e) => {
