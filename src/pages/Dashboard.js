@@ -41,14 +41,19 @@ function Dashboard() {
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({ ...formData, photo: reader.result });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+        // Step 1: Size check (Agar 1MB se badi hai toh upload hi mat karo)
+        if (file.size > 1000000) { 
+            alert("Bhai, photo ka size bahut bada hai (1MB+). Mobile settings se quality kam karein ya screenshot le kar upload karein.");
+            return;
+        }
 
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFormData({ ...formData, photo: reader.result });
+        };
+        reader.readAsDataURL(file);
+    }
+};
   const handleSubmit = async (e) => {
     e.preventDefault();
     const total = Number(formData.total_fees);
