@@ -92,7 +92,7 @@ function StudentProfile() {
             <p className="text-gray-600 font-medium">🆔 Student ID: <span className="text-indigo-600 font-bold">#LIB-2026-{student.id}</span></p>
           </div>
           <div className="pt-4 mt-4 border-t border-dashed border-gray-200 show-on-print hidden">
-            <p className="text-xs text-gray-400 italic">This is a digitally generated receipt from Bikaner Library System.</p>
+            <p className="text-xs text-gray-400 italic">This is a digitally generated receipt from Laxmi Library System.</p>
           </div>
         </div>
         
