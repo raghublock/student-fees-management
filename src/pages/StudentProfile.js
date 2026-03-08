@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import config from '../config'; // 🚀 Config file import kar li gayi hai
 
 function StudentProfile() {
   const { id } = useParams();
@@ -51,14 +52,14 @@ function StudentProfile() {
 
   const handlePrint = () => { window.print(); };
 
-  if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">Laxmi Library | Profile Loading...</div>;
+  if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
       
       {/* Navigation Header */}
       <div className="max-w-5xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600 no-print">
-        <h1 className="text-3xl font-black text-indigo-700 uppercase">Laxmi Library 📚</h1>
+        <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} {config.mainEmoji}</h1>
         <div className="flex gap-3">
           <button onClick={handlePrint} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-black shadow-md hover:bg-indigo-700 transition active:scale-95">🖨️ Print Receipt</button>
           <Link to="/dashboard" className="bg-slate-200 text-slate-700 px-5 py-2 rounded-lg font-black hover:bg-slate-300">← Back</Link>
@@ -71,7 +72,7 @@ function StudentProfile() {
         <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
           <img 
             src={student.photo || 'https://via.placeholder.com/150'} 
-            alt="student" 
+            alt={config.userType} 
             className="h-44 w-44 rounded-3xl object-cover border-4 border-indigo-50 shadow-lg"
           />
           
@@ -80,16 +81,16 @@ function StudentProfile() {
               <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">{student.name}</h2>
               {student.has_active_plan && (
                 <span className="bg-gradient-to-r from-yellow-400 to-orange-600 text-white text-[10px] px-4 py-1.5 rounded-full font-black animate-pulse shadow-xl border border-yellow-200 uppercase">
-                  PRO MEMBER 📦
+                  PRO {config.userType.toUpperCase()} 📦
                 </span>
               )}
             </div>
             <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">
-              Account Status: {student.has_active_plan ? 'Custom Plan Activated' : 'Regular Monthly Fees'}
+              Account Status: {student.has_active_plan ? `Custom ${config.planLabel} Activated` : 'Regular Monthly Fees'}
             </p>
             <div className="pt-4 text-sm font-bold text-slate-600 grid grid-cols-1 md:grid-cols-2 gap-2 uppercase">
                 <p>📞 {student.mobile || 'N/A'}</p>
-                <p>🆔 Member ID: #LX-{student.id}</p>
+                <p>🆔 {config.userType} ID: #{config.receiptPrefix}-{student.id}</p>
             </div>
           </div>
 
@@ -100,7 +101,7 @@ function StudentProfile() {
              </h3>
              <div className="space-y-3 text-sm font-bold">
                 <div className="flex justify-between opacity-80">
-                  <span>{student.has_active_plan ? 'Plan Price:' : 'Total Fees:'}</span> 
+                  <span>{student.has_active_plan ? `${config.planLabel} Price:` : 'Total Fees:'}</span> 
                   <span>₹{student.has_active_plan ? paymentHistory[0]?.price || '...' : student.total_fees}</span>
                 </div>
                 <div className="flex justify-between text-green-300">
@@ -124,14 +125,14 @@ function StudentProfile() {
         {/* Dynamic Ledger Table */}
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
           <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-800'} p-5 text-white font-black uppercase tracking-widest text-center text-sm`}>
-             {student.has_active_plan ? '📦 ACTIVE PLAN PURCHASE RECORD' : '📜 MONTHLY FEES PAYMENT LEDGER'}
+             {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 MONTHLY FEES PAYMENT LEDGER'}
           </div>
           <table className="w-full text-center border-collapse">
             <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
               <tr>
                 <th className="p-5 border-b">Transaction Date</th>
                 <th className="p-5 border-b">Amount</th>
-                <th className="p-5 border-b">{student.has_active_plan ? 'Plan Description' : 'Month / Details'}</th>
+                <th className="p-5 border-b">{student.has_active_plan ? `${config.planLabel} Description` : 'Month / Details'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -146,7 +147,7 @@ function StudentProfile() {
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan="3" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No payment history found in {student.has_active_plan ? 'Plans' : 'Fees'} database.</td></tr>
+                <tr><td colSpan="3" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No payment history found in {student.has_active_plan ? `${config.planLabel}s` : 'Fees'} database.</td></tr>
               )}
             </tbody>
           </table>
