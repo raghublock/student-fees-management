@@ -10,7 +10,7 @@ import PlanPurchase from './pages/PlanPurchase';
 import Analytics from './pages/Analytics';
 
 // Agar FeesDashboard ka alag page hai toh usko bhi yahan import karna 
-import FeesDashboard from './pages/Fees';
+import FeesDashboard from './pages/FeesDashboard';
 
 function App() {
   return (
