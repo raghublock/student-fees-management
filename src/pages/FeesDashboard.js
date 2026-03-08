@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useFees } from '../hooks/useFees'; 
+import config from '../config'; // 🚀 Config file import ki gayi hai
 
 function FeesDashboard() {
   const [students, setStudents] = useState([]);
-  const { feesHistory, fetchHistory } = useFees();
+  const [feesHistory, setFeesHistory] = useState([]); // 🚀 Hook ki jagah local state use kiya
   const [editingId, setEditingId] = useState(null);
+  const navigate = useNavigate();
   
   // 📅 Default date aaj ki set ki hai
   const [formData, setFormData] = useState({ 
@@ -14,7 +15,7 @@ function FeesDashboard() {
     amount: '', 
     paid_on: new Date().toISOString().split('T')[0], 
     mode: 'Cash', 
-    month: '', // Naya field for Month
+    month: '', 
     description: '', 
     status: 'Paid' 
   });
@@ -22,17 +23,31 @@ function FeesDashboard() {
   const API_URL = "https://library-api.raghuveerbhati525.workers.dev";
   const token = localStorage.getItem('adminToken');
 
+  // 🔄 Data Fetching Function (Hook hata kar yahin daal diya taaki crash na ho)
+  const fetchData = async () => {
+    try {
+      // Fetch Students
+      const resStudents = await fetch(`${API_URL}/api/students`, { 
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const dataStudents = await resStudents.json();
+      setStudents(Array.isArray(dataStudents) ? dataStudents : []);
+
+      // Fetch Fees History
+      const resHistory = await fetch(`${API_URL}/api/fees/history`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const dataHistory = await resHistory.json();
+      setFeesHistory(Array.isArray(dataHistory) ? dataHistory : []);
+    } catch (err) {
+      toast.error("Data load karne mein problem aayi.");
+    }
+  };
+
   useEffect(() => {
-    fetch(`${API_URL}/api/students`, { 
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setStudents(data);
-        else setStudents([]);
-      })
-      .catch(err => setStudents([]));
-  }, [token]);
+    if (!token) return navigate('/');
+    fetchData();
+  }, [token, navigate]);
 
   // ➕ Save / Update Logic
   const handleSubmit = async (e) => {
@@ -50,14 +65,14 @@ function FeesDashboard() {
       });
 
       if(res.ok) {
-        toast.success(editingId ? 'Record Updated!' : 'Fees Record Saved!', { id: toastId });
+        toast.success(editingId ? 'Record Updated! ✅' : 'Fees Record Saved! ✅', { id: toastId });
         setFormData({ 
           student_id: '', amount: '', 
           paid_on: new Date().toISOString().split('T')[0], 
           mode: 'Cash', month: '', description: '', status: 'Paid' 
         });
         setEditingId(null);
-        fetchHistory(); 
+        fetchData(); // 🚀 Refreshing table data
       } else {
         toast.error('Error saving record', { id: toastId });
       }
@@ -72,8 +87,8 @@ function FeesDashboard() {
     setFormData({
       student_id: fee.student_id,
       amount: fee.amount,
-      paid_on: fee.paid_on.split('T')[0],
-      mode: fee.mode,
+      paid_on: fee.paid_on ? fee.paid_on.split('T')[0] : new Date().toISOString().split('T')[0],
+      mode: fee.mode || 'Cash',
       month: fee.month || '',
       description: fee.description || '',
       status: fee.status || 'Paid'
@@ -83,15 +98,15 @@ function FeesDashboard() {
 
   // 🗑️ Delete Logic
   const handleDelete = async (id) => {
-    if(window.confirm("Kya aap ye fees record mitana chahte hain?")) {
+    if(window.confirm("Kya aap ye fees record hamesha ke liye mitana chahte hain?")) {
       try {
         const res = await fetch(`${API_URL}/api/fees/delete/${id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if(res.ok) {
-          toast.success('Record Deleted!');
-          fetchHistory();
+          toast.success('Record Deleted! 🗑️');
+          fetchData();
         }
       } catch (err) {
         toast.error('Delete fail ho gaya.');
@@ -101,94 +116,115 @@ function FeesDashboard() {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-lg shadow-sm border-b-4 border-green-600">
+      
+      {/* Header (Dynamic Config Applied) */}
+      <div className="max-w-7xl mx-auto flex justify-between items-center mb-8 bg-white p-5 rounded-xl shadow-md border-b-4 border-green-600">
         <div>
-          <h1 className="text-3xl font-extrabold text-green-700">Laxmi Library Fees 💰</h1>
-          <p className="text-xs text-gray-500 font-bold">Official Management Portal</p>
+          <h1 className="text-3xl font-black text-green-700 uppercase tracking-tighter">{config.appName} Fees 💰</h1>
+          <p className="text-gray-500 font-bold text-xs uppercase italic">{config.branchName} | Management Portal</p>
         </div>
-        <div className="space-x-4">
-          <Link to="/dashboard" className="bg-blue-100 text-blue-700 px-4 py-2 rounded font-bold hover:bg-blue-200 transition">← Back to Students</Link>
-          <button onClick={() => {localStorage.clear(); window.location.href='/';}} className="bg-red-500 text-white px-4 py-2 rounded font-bold shadow-md">Logout</button>
+        <div className="flex gap-3">
+          <Link to="/dashboard" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-black shadow-lg hover:bg-indigo-700 transition flex items-center gap-2">← Back to Dashboard</Link>
         </div>
       </div>
 
       {/* Form Section */}
-      <div className={`max-w-7xl mx-auto bg-white p-6 rounded-xl shadow-md mb-8 border-t-4 ${editingId ? 'border-yellow-500 bg-yellow-50' : 'border-green-600'}`}>
-        <h2 className="text-xl font-bold mb-4 text-gray-700 border-b pb-2 uppercase tracking-wide">
+      <div className={`max-w-7xl mx-auto bg-white p-8 rounded-2xl shadow-xl mb-10 border-t-8 ${editingId ? 'border-yellow-500 bg-yellow-50' : 'border-green-600'}`}>
+        <h2 className="text-lg font-black mb-6 text-slate-700 uppercase tracking-wide">
           {editingId ? "✏️ Edit Fees Record" : "➕ Nayi Fees Entry Karein"}
         </h2>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <select className="border p-3 rounded-lg outline-none focus:ring-2 focus:ring-green-400" value={formData.student_id} onChange={(e) => setFormData({...formData, student_id: e.target.value})} required>
-            <option value="">-- Student Select Karein --</option>
-            {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
           
-          <input type="number" placeholder="Amount (₹)" className="border p-3 rounded-lg outline-none focus:ring-2 focus:ring-green-400" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{config.userType} Select Karein</label>
+            <select className="border-2 p-3 rounded-xl outline-none focus:border-green-500 font-bold text-slate-700" value={formData.student_id} onChange={(e) => setFormData({...formData, student_id: e.target.value})} required>
+              <option value="">-- Choose {config.userType} --</option>
+              {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
           
-          <input type="date" className="border p-3 rounded-lg outline-none" value={formData.paid_on} onChange={(e) => setFormData({...formData, paid_on: e.target.value})} required />
-          
-          {/* 📅 Month Picker */}
-          <select className="border p-3 rounded-lg outline-none bg-indigo-50 font-bold text-indigo-700" value={formData.month} onChange={(e) => setFormData({...formData, month: e.target.value})}>
-            <option value="">-- Kis Month ki Fees? --</option>
-            {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-1">
+             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Amount (₹)</label>
+             <input type="number" placeholder="Enter Amount" className="border-2 p-3 rounded-xl outline-none focus:border-green-500 font-bold" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
+          </div>
 
-          <select className="border p-3 rounded-lg outline-none" value={formData.mode} onChange={(e) => setFormData({...formData, mode: e.target.value})}>
-            <option value="Cash">Cash</option>
-            <option value="UPI">UPI / Online</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-          </select>
-
-          <input type="text" placeholder="Description (e.g., Note if any)" className="border p-3 rounded-lg outline-none md:col-span-2" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+          <div className="flex flex-col gap-1">
+             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Payment Date 📅</label>
+             <input type="date" className="border-2 p-3 rounded-xl outline-none focus:border-green-500 font-bold bg-green-50" value={formData.paid_on} onChange={(e) => setFormData({...formData, paid_on: e.target.value})} required />
+          </div>
           
-          <div className="flex gap-2">
-            <button type="submit" className={`flex-1 font-bold py-3 rounded-lg transition shadow-lg text-white ${editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-600 hover:bg-green-700'}`}>
-              {editingId ? "Update Entry" : "Save Entry"}
+          <div className="flex flex-col gap-1">
+             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Billing Month</label>
+             <select className="border-2 p-3 rounded-xl outline-none focus:border-green-500 font-bold text-indigo-700 bg-indigo-50" value={formData.month} onChange={(e) => setFormData({...formData, month: e.target.value})}>
+                <option value="">-- Select Month --</option>
+                {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+             </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Payment Mode</label>
+             <select className="border-2 p-3 rounded-xl outline-none focus:border-green-500 font-bold" value={formData.mode} onChange={(e) => setFormData({...formData, mode: e.target.value})}>
+                <option value="Cash">Cash 💵</option>
+                <option value="UPI">UPI / Online 📱</option>
+                <option value="Bank Transfer">Bank Transfer 🏦</option>
+             </select>
+          </div>
+
+          <div className="flex flex-col gap-1 md:col-span-2">
+             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Description / Note</label>
+             <input type="text" placeholder="e.g., Pending amount cleared" className="border-2 p-3 rounded-xl outline-none focus:border-green-500 font-bold" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+          </div>
+          
+          <div className="flex gap-2 items-end">
+            <button type="submit" className={`w-full font-black py-4 rounded-xl transition shadow-xl text-white uppercase tracking-widest active:scale-95 ${editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-600 hover:bg-green-700'}`}>
+              {editingId ? "Update Entry ✏️" : "Save Entry 🚀"}
             </button>
             {editingId && (
-              <button type="button" onClick={() => {setEditingId(null); setFormData({student_id: '', amount: '', paid_on: new Date().toISOString().split('T')[0], mode: 'Cash', month: '', description: '', status: 'Paid'});}} className="bg-gray-400 text-white px-4 rounded-lg font-bold">Cancel</button>
+              <button type="button" onClick={() => {setEditingId(null); setFormData({student_id: '', amount: '', paid_on: new Date().toISOString().split('T')[0], mode: 'Cash', month: '', description: '', status: 'Paid'});}} className="bg-slate-400 text-white px-6 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-slate-500">Cancel</button>
             )}
           </div>
         </form>
       </div>
 
       {/* Table Section */}
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-xl overflow-x-auto border border-gray-200">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-800 text-white uppercase text-xs">
-            <tr>
-              <th className="p-4 text-left">Date</th>
-              <th className="p-4 text-left">Student Name</th>
-              <th className="p-4 text-left">Month</th>
-              <th className="p-4 text-left">Amount</th>
-              <th className="p-4 text-left">Mode</th>
-              <th className="p-4 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {feesHistory.map(fee => (
-              <tr key={fee.id} className="hover:bg-green-50/50 transition-colors">
-                <td className="p-4 text-gray-600">{new Date(fee.paid_on).toLocaleDateString('en-IN')}</td>
-                <td className="p-4 font-black text-gray-800 text-base">{fee.student_name}</td>
-                <td className="p-4">
-                  <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                    {fee.month || 'General'}
-                  </span>
-                </td>
-                <td className="p-4 font-black text-green-600 text-lg">₹{fee.amount}</td>
-                <td className="p-4 text-gray-500 font-medium">{fee.mode}</td>
-                <td className="p-4 text-center space-x-3">
-                  <button onClick={() => handleEdit(fee)} className="text-blue-600 font-bold hover:text-blue-800 transition">Edit</button>
-                  <button onClick={() => handleDelete(fee.id)} className="text-red-500 font-bold hover:text-red-700 transition">Delete</button>
-                </td>
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="bg-slate-800 p-4"><h3 className="text-white font-black uppercase tracking-wider">Fees History 📜</h3></div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-black tracking-widest">
+              <tr>
+                <th className="p-4 border-b">Payment Date</th>
+                <th className="p-4 border-b">{config.userType} Name</th>
+                <th className="p-4 border-b">Month</th>
+                <th className="p-4 border-b">Amount</th>
+                <th className="p-4 border-b">Mode</th>
+                <th className="p-4 border-b text-center">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {feesHistory.length === 0 && <p className="text-center p-12 text-gray-400 font-medium italic">Abhi tak koi fees entry nahi hui hai.</p>}
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {feesHistory.map(fee => (
+                <tr key={fee.id} className="hover:bg-green-50/50 transition-colors">
+                  <td className="p-4 font-bold text-slate-500 uppercase text-xs">{new Date(fee.paid_on).toLocaleDateString('en-IN')}</td>
+                  <td className="p-4 font-black text-slate-800 uppercase">{fee.student_name}</td>
+                  <td className="p-4">
+                    <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-200">
+                      {fee.month || 'General'}
+                    </span>
+                  </td>
+                  <td className="p-4 font-black text-green-600 text-lg italic">₹{fee.amount}</td>
+                  <td className="p-4 text-slate-500 font-bold text-xs uppercase">{fee.mode}</td>
+                  <td className="p-4 text-center space-x-2">
+                    <button onClick={() => handleEdit(fee)} className="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl font-black text-[10px] hover:bg-amber-200 transition-all uppercase">Edit</button>
+                    <button onClick={() => handleDelete(fee.id)} className="bg-red-100 text-red-600 px-4 py-2 rounded-xl font-black text-[10px] hover:bg-red-200 transition-all uppercase">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {feesHistory.length === 0 && <p className="text-center p-16 text-slate-300 font-black uppercase tracking-widest text-xs">Abhi tak koi fees entry nahi hui hai.</p>}
+        </div>
       </div>
     </div>
   );
