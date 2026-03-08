@@ -118,7 +118,6 @@ function Dashboard() {
       extra_fees: student.extra_fees || '',
       mobile: student.mobile || '',
       whatsapp: student.whatsapp || '',
-      aadhaar_no: student.aadhaar_no || '',
       email: student.email || '',
       photo: student.photo || ''
     });
@@ -174,7 +173,6 @@ function Dashboard() {
             </div>
           </div>
 
-          <input type="text" placeholder="Aadhaar Number" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.aadhaar_no} onChange={(e) => setFormData({...formData, aadhaar_no: e.target.value})} />
           <input type="number" placeholder="Total Fees" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required />
           <input type="number" placeholder="Paid Fees" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
           <input type="number" placeholder="Extra Fees" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.extra_fees} onChange={(e) => setFormData({...formData, extra_fees: e.target.value})} />
@@ -235,7 +233,7 @@ function Dashboard() {
                 <td className="p-3 text-left font-bold text-blue-900 text-lg">{s.name}</td>
                 <td className="p-3 text-left text-gray-700 font-medium text-xs">
                    📞 {s.mobile || '-'} <br/>
-                   💳 Aadhaar: {s.aadhaar_no || '-'}
+                   }
                 </td>
                 <td className="p-3 text-left">
                   <span className="text-gray-600 font-medium">Total: ₹{s.total_fees || 0}</span> <br/>
