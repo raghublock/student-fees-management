@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import FeesDashboard from './pages/FeesDashboard';
 import StudentProfile from './pages/StudentProfile'; // 👈 Ye import check karein
+import PlanPurchase from './pages/PlanPurchase';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('adminToken');
@@ -19,7 +20,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/fees" element={<ProtectedRoute><FeesDashboard /></ProtectedRoute>} /> 
-        
+        <Route path="/plans" element={<PlanPurchase />} />
         {/* 🚀 YEH LINE HAI ASLEE SOLUTION: Dashboard ke Link ko yahan se rasta milta hai */}
         <Route path="/student/:id" element={<ProtectedRoute><StudentProfile /></ProtectedRoute>} /> 
       </Routes>
