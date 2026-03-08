@@ -9,7 +9,8 @@ function StudentProfile() {
   const [student, setStudent] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
   
-  const API_URL = "https://library-api.raghuveerbhati525.workers.dev";
+  // ✅ Puraana hardcoded link hata kar dynamic config link laga diya!
+  const API_URL = config.apiUrl; 
   const token = localStorage.getItem('adminToken');
 
   useEffect(() => {
@@ -70,8 +71,10 @@ function StudentProfile() {
         
         {/* Profile Card Section */}
         <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
+          
+          {/* ✅ Naya Photo Logic: Agar DB mein photo_url hai toh wo dikhao, warna default dummy photo dikhao */}
           <img 
-            src={student.photo || 'https://via.placeholder.com/150'} 
+            src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} 
             alt={config.userType} 
             className="h-44 w-44 rounded-3xl object-cover border-4 border-indigo-50 shadow-lg"
           />
