@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import config from '../config'; // 🚀 Config file import kar li
 
 function Dashboard() {
   const [students, setStudents] = useState([]);
@@ -79,7 +80,7 @@ function Dashboard() {
       if (response.ok) {
         setFormData({ name: '', total_fees: '', paid_fees: '', extra_fees: '', mobile: '', whatsapp: '', email: '', photo: '' });
         setEditingId(null); 
-        toast.success(editingId ? "Data Updated! ✏️" : "Student Saved! ✅");
+        toast.success(editingId ? "Data Updated! ✏️" : `${config.userType} Saved! ✅`);
         fetchStudents(); 
       }
     } catch (error) {
@@ -121,21 +122,19 @@ function Dashboard() {
   return (
     <div className="p-4 bg-slate-50 min-h-screen font-sans">
       
-      {/* 🚀 Header Section - Analytics Button Added Here */}
+      {/* Header Section (Dynamic) */}
       <div className="flex justify-between items-center max-w-7xl mx-auto mb-8 bg-white p-5 rounded-xl shadow-md border-b-4 border-indigo-700 transition-all flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-black text-indigo-900">Laxmi Library 📚</h1>
-          <p className="text-gray-500 font-bold italic">Bikaner Branch | Welcome, {adminName || 'Admin'}</p>
+          <h1 className="text-3xl font-black text-indigo-900">{config.appName} {config.mainEmoji}</h1>
+          <p className="text-gray-500 font-bold italic">{config.branchName} | Welcome, {adminName || 'Admin'}</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          
-          {/* 📊 NEW: Analytics Button */}
           <Link to="/analytics" className="bg-slate-800 text-white px-5 py-2 rounded-lg font-bold hover:bg-black shadow-lg border-b-4 border-slate-600 transition active:scale-95 flex items-center gap-2">
             <span>📊</span> Analytics
           </Link>
 
           <Link to="/plans" className="bg-orange-500 text-white px-5 py-2 rounded-lg font-bold hover:bg-orange-600 shadow-lg border-b-4 border-orange-800 transition active:scale-95 flex items-center gap-2">
-            <span>📦</span> Plans Manager
+            <span>📦</span> {config.planLabel}s Manager
           </Link>
           
           <Link to="/fees" className="bg-green-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-green-700 shadow-lg border-b-4 border-green-800 transition flex items-center gap-2">
@@ -148,18 +147,18 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Form Section */}
+      {/* Form Section (Dynamic) */}
       <div className={`max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-t-8 ${editingId ? 'border-yellow-500 bg-yellow-50' : 'border-indigo-600'}`}>
         <h2 className="text-xl font-black mb-6 text-gray-800 uppercase tracking-wider">
-          {editingId ? "✏️ Update Student" : "➕ Add New Student"}
+          {editingId ? `✏️ Update ${config.userType}` : `➕ Add New ${config.userType}`}
         </h2>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input type="text" placeholder="Student Name" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
+          <input type="text" placeholder={`${config.userType} Name`} className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
           <input type="text" placeholder="Mobile" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} />
           <input type="text" placeholder="WhatsApp" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.whatsapp} onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} />
           
           <div className="flex flex-col border-2 p-2 rounded-xl bg-gray-50 border-dashed border-indigo-200">
-            <label className="text-[10px] font-black text-indigo-400 mb-1 uppercase">Student Photo</label>
+            <label className="text-[10px] font-black text-indigo-400 mb-1 uppercase">{config.userType} Photo</label>
             <div className="flex items-center gap-2">
               <input type="file" accept="image/*" className="text-[10px] w-full cursor-pointer" onChange={handlePhotoChange} />
               {formData.photo && <img src={formData.photo} alt="Preview" className="h-10 w-10 rounded-full border-2 border-indigo-500 object-cover shadow-sm" />}
@@ -171,16 +170,16 @@ function Dashboard() {
           <input type="number" placeholder="Extra" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.extra_fees} onChange={(e) => setFormData({...formData, extra_fees: e.target.value})} />
           
           <button type="submit" className={`text-white font-black py-3 rounded-xl shadow-xl transition-all ${editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-indigo-600 hover:bg-indigo-800'}`}>
-            {editingId ? "SAVE CHANGES" : "REGISTER STUDENT"}
+            {editingId ? "SAVE CHANGES" : `REGISTER ${config.userType.toUpperCase()}`}
           </button>
         </form>
       </div>
 
-      {/* Search & Filter */}
+      {/* Search & Filter (Dynamic) */}
       <div className="max-w-7xl mx-auto flex flex-wrap gap-4 items-center justify-between mb-4">
         <input 
           type="text" 
-          placeholder="🔍 Search Student..." 
+          placeholder={`🔍 Search ${config.userType}...`} 
           className="border-2 p-3 rounded-2xl w-full max-w-md shadow-sm outline-none focus:border-indigo-500"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -191,7 +190,7 @@ function Dashboard() {
         </label>
       </div>
 
-      {/* Data Table */}
+      {/* Data Table (Dynamic) */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
         <table className="w-full text-left">
           <thead className="bg-slate-800 text-white">
@@ -206,7 +205,7 @@ function Dashboard() {
               <tr key={s.id} className="hover:bg-indigo-50/50 transition-colors">
                 <td className="p-4">
                   {s.photo ? (
-                    <img src={s.photo} alt="Student" className="h-14 w-14 rounded-2xl object-cover border-2 border-white shadow-md" />
+                    <img src={s.photo} alt={config.userType} className="h-14 w-14 rounded-2xl object-cover border-2 border-white shadow-md" />
                   ) : (
                     <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-400 border border-slate-200 uppercase">No Photo</div>
                   )}
@@ -216,7 +215,7 @@ function Dashboard() {
                     <span className="font-black text-slate-800 text-lg uppercase">{s.name}</span>
                     {s.has_active_plan && (
                       <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black shadow-sm animate-pulse border border-yellow-200">
-                        PRO STUDENT
+                        PRO {config.userType.toUpperCase()}
                       </span>
                     )}
                   </div>
