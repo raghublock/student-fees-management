@@ -14,9 +14,14 @@ function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showPendingOnly, setShowPendingOnly] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  
+  // 🚀 Naya State: Photo upload hone ka loading dikhane ke liye
+  const [isUploading, setIsUploading] = useState(false);
 
   const navigate = useNavigate();
-  const API_URL = "https://library-api.raghuveerbhati525.workers.dev";
+  
+  // ✅ Puraana hardcoded link hata diya! Ab ye config se chalega
+  const API_URL = config.apiUrl;
   const token = localStorage.getItem('adminToken');
   const adminName = localStorage.getItem('adminName');
 
@@ -37,32 +42,50 @@ function Dashboard() {
     else fetchStudents(); 
   }, [navigate, token]);
 
-  const handlePhotoChange = (e) => {
+  // 🚀 NAYA CLOUDINARY UPLOAD MAGIC
+  const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 400; 
-                const scaleSize = MAX_WIDTH / img.width;
-                canvas.width = MAX_WIDTH;
-                canvas.height = img.height * scaleSize;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                setFormData({ ...formData, photo: dataUrl });
-                toast.success("Photo optimized!");
-            };
-        };
+    if (!file) return;
+
+    setIsUploading(true);
+    const toastId = toast.loading("Photo Cloud par upload ho rahi hai... ☁️");
+
+    // Cloudinary ka form data banayenge
+    const data = new FormData();
+    data.append('file', file);
+    
+    // ⚠️ DHYAN DEIN: Yahan apna Preset Name daalein (Jaise: gym_preset)
+    data.append('upload_preset', 'YOUR_UPLOAD_PRESET_HERE'); 
+
+    try {
+      // ⚠️ DHYAN DEIN: URL mein YOUR_CLOUD_NAME ko apne Cloudinary naam se badlein
+      const res = await fetch('https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload', {
+        method: 'POST',
+        body: data
+      });
+
+      const uploadedImage = await res.json();
+      
+      if (uploadedImage.secure_url) {
+        setFormData({ ...formData, photo: uploadedImage.secure_url });
+        toast.success("Photo upload aur compress ho gayi! ✅", { id: toastId });
+      } else {
+        toast.error("Upload fail ho gaya. Settings check karein.", { id: toastId });
+      }
+    } catch (error) {
+      toast.error("Cloudinary connection error.", { id: toastId });
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isUploading) {
+      toast.error("Pehle photo upload hone dein!");
+      return;
+    }
+
     const total = Number(formData.total_fees);
     const paid = Number(formData.paid_fees);
     const due = total - paid;
@@ -157,20 +180,21 @@ function Dashboard() {
           <input type="text" placeholder="Mobile" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} />
           <input type="text" placeholder="WhatsApp" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.whatsapp} onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} />
           
-          <div className="flex flex-col border-2 p-2 rounded-xl bg-gray-50 border-dashed border-indigo-200">
+          <div className="flex flex-col border-2 p-2 rounded-xl bg-gray-50 border-dashed border-indigo-200 relative">
             <label className="text-[10px] font-black text-indigo-400 mb-1 uppercase">{config.userType} Photo</label>
             <div className="flex items-center gap-2">
-              <input type="file" accept="image/*" className="text-[10px] w-full cursor-pointer" onChange={handlePhotoChange} />
+              <input type="file" accept="image/*" className="text-[10px] w-full cursor-pointer" onChange={handlePhotoChange} disabled={isUploading} />
               {formData.photo && <img src={formData.photo} alt="Preview" className="h-10 w-10 rounded-full border-2 border-indigo-500 object-cover shadow-sm" />}
             </div>
+            {isUploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center text-xs font-bold text-indigo-600">Uploading...</div>}
           </div>
 
           <input type="number" placeholder="Total Fees" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required />
           <input type="number" placeholder="Paid Fees" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
           <input type="number" placeholder="Extra" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.extra_fees} onChange={(e) => setFormData({...formData, extra_fees: e.target.value})} />
           
-          <button type="submit" className={`text-white font-black py-3 rounded-xl shadow-xl transition-all ${editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-indigo-600 hover:bg-indigo-800'}`}>
-            {editingId ? "SAVE CHANGES" : `REGISTER ${config.userType.toUpperCase()}`}
+          <button type="submit" disabled={isUploading} className={`text-white font-black py-3 rounded-xl shadow-xl transition-all ${isUploading ? 'bg-gray-400 cursor-not-allowed' : editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-indigo-600 hover:bg-indigo-800'}`}>
+            {isUploading ? 'WAIT...' : editingId ? "SAVE CHANGES" : `REGISTER ${config.userType.toUpperCase()}`}
           </button>
         </form>
       </div>
