@@ -10,7 +10,7 @@ import PlanPurchase from './pages/PlanPurchase';
 import Analytics from './pages/Analytics';
 
 // Agar FeesDashboard ka alag page hai toh usko bhi yahan import karna 
-// import FeesDashboard from './pages/FeesDashboard';
+import FeesDashboard from './pages/Fees';
 
 function App() {
   return (
@@ -41,7 +41,7 @@ function App() {
         <Route path="/analytics" element={<Analytics />} />
 
         {/* Agar Fees ka alag page hai toh isey uncomment karein: */}
-        {/* <Route path="/fees" element={<FeesDashboard />} /> */}
+        <Route path="/fees" element={<FeesDashboard />} />
         
       </Routes>
     </Router>
