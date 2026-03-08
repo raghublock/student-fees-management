@@ -42,41 +42,60 @@ function Dashboard() {
     else fetchStudents(); 
   }, [navigate, token]);
 
-  // 🚀 NAYA CLOUDINARY UPLOAD MAGIC
+  // 🚀 NAYA CLOUDINARY UPLOAD + COMPRESSION MAGIC
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setIsUploading(true);
-    const toastId = toast.loading("Photo Cloud par upload ho rahi hai... ☁️");
+    const toastId = toast.loading("Photo Compress (<100KB) aur Upload ho rahi hai... ⏳");
 
-    // Cloudinary ka form data banayenge
-    const data = new FormData();
-    data.append('file', file);
-    
-    // ⚠️ DHYAN DEIN: Yahan apna Preset Name daalein (Jaise: gym_preset)
-    data.append('upload_preset', 'gym_preset'); 
+    // 1. Photo ko browser mein hi compress karna
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400; // Resolution limit kar diya
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Quality 0.6 set ki hai taaki size 100KB ke andar rahe
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6); 
 
-    try {
-      // ⚠️ DHYAN DEIN: URL mein YOUR_CLOUD_NAME ko apne Cloudinary naam se badlein
-      const res = await fetch('https://api.cloudinary.com/v1_1/doaodzwor/image/upload', {
-        method: 'POST',
-        body: data
-      });
+        // 2. Chhoti ho chuki photo ko Cloudinary par bhejna
+        const data = new FormData();
+        data.append('file', compressedBase64); 
+        data.append('upload_preset', 'gym_preset'); // Aapka preset
 
-      const uploadedImage = await res.json();
-      
-      if (uploadedImage.secure_url) {
-        setFormData({ ...formData, photo: uploadedImage.secure_url });
-        toast.success("Photo upload aur compress ho gayi! ✅", { id: toastId });
-      } else {
-        toast.error("Upload fail ho gaya. Settings check karein.", { id: toastId });
-      }
-    } catch (error) {
-      toast.error("Cloudinary connection error.", { id: toastId });
-    } finally {
-      setIsUploading(false);
-    }
+        try {
+          const res = await fetch('https://api.cloudinary.com/v1_1/doaodzwor/image/upload', { // Aapka Cloud Name
+            method: 'POST',
+            body: data
+          });
+
+          const uploadedImage = await res.json();
+          
+          if (uploadedImage.secure_url) {
+            // prev state use kiya taaki purana data gayab na ho
+            setFormData(prev => ({ ...prev, photo: uploadedImage.secure_url }));
+            toast.success("Photo Compress aur Upload ho gayi! ✅", { id: toastId });
+          } else {
+            toast.error("Upload fail ho gaya. Settings check karein.", { id: toastId });
+          }
+        } catch (error) {
+          toast.error("Cloudinary connection error.", { id: toastId });
+        } finally {
+          setIsUploading(false);
+        }
+      };
+    };
   };
 
   const handleSubmit = async (e) => {
