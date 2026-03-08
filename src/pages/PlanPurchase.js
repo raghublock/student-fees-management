@@ -25,6 +25,28 @@ function PlanPurchase() {
       .then(res => res.json()).then(data => setPlans(data));
   }, []);
 
+  // 🗑️ Delete Plan Function
+const handleDeletePlan = async (id) => {
+  if(window.confirm("Kya aap is plan ko cancel karna chahte hain?")) {
+    const res = await fetch(`${API_URL}/api/plans/delete/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if(res.ok) {
+      toast.success("Plan Removed! 🗑️");
+      fetchPlans(); // List refresh karne ke liye
+    }
+  }
+};
+// Table Row mein Button
+<td className="p-4 text-center">
+  <button 
+    onClick={() => handleDeletePlan(p.id)} 
+    className="bg-red-100 text-red-600 px-3 py-1 rounded-md font-bold hover:bg-red-200 transition"
+  >
+    Delete
+  </button>
+</td>
   const handlePurchase = async (e) => {
     e.preventDefault();
     const res = await fetch(`${API_URL}/api/plans/purchase`, {
