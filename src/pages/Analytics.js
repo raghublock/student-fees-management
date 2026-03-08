@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import config from '../config'; // 🚀 Config file import ki gayi hai
 
 function Analytics() {
   const [data, setData] = useState(null);
@@ -56,12 +57,12 @@ function Analytics() {
 
   const sendBulkReminders = () => {
     if (pendingStudents.length === 0) {
-      toast.error("Koi pending fees nahi hai!"); return;
+      toast.error("Koi pending dues nahi hai!"); return;
     }
-    if(window.confirm(`${pendingStudents.length} students ko WhatsApp par reminder bheja jayega. Continue?`)) {
+    if(window.confirm(`${pendingStudents.length} ${config.userTypePlural.toLowerCase()} ko WhatsApp par reminder bheja jayega. Continue?`)) {
       pendingStudents.forEach((s, index) => {
         setTimeout(() => {
-          const msg = `Namaste ${s.name},\nLaxmi Library Bikaner se yaad dilaya jata hai ki aapki fees ₹${s.due_fees} pending hai. Kripya jama karayein. 🙏`;
+          const msg = `Namaste ${s.name},\n${config.appName} ${config.branchName} se yaad dilaya jata hai ki aapka ₹${s.due_fees} due hai. Kripya samay par jama karayein. 🙏`;
           window.open(`https://wa.me/91${s.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
         }, index * 500);
       });
@@ -69,7 +70,7 @@ function Analytics() {
     }
   };
 
-  if (!data) return <div className="p-20 text-center font-black text-slate-400 text-xl animate-pulse uppercase">Fetching Data... ⏳</div>;
+  if (!data) return <div className="p-20 text-center font-black text-slate-400 text-xl animate-pulse uppercase">Fetching Business Data... ⏳</div>;
 
   const currentMonthRegular = data.revenue?.regular_monthly || 0;
   const currentMonthPro = data.revenue?.pro_monthly || 0;
@@ -82,7 +83,7 @@ function Analytics() {
       <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center mb-8 bg-white p-5 rounded-2xl shadow-md border-b-4 border-slate-800 gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">📊 Business Analytics</h1>
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Laxmi Library Revenue Dashboard</p>
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">{config.appName} Revenue Dashboard</p>
         </div>
         <Link to="/dashboard" className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition flex items-center gap-2">
           ← Back
@@ -116,7 +117,7 @@ function Analytics() {
                  <h2 className="text-3xl font-black text-white">₹{customStats.regular}</h2>
                </div>
                <div className="bg-slate-700 p-4 rounded-xl">
-                 <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">PRO Plans</p>
+                 <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">PRO {config.planLabel}s</p>
                  <h2 className="text-3xl font-black text-white">₹{customStats.pro}</h2>
                </div>
                <div className="bg-yellow-500 p-4 rounded-xl text-slate-900">
@@ -140,7 +141,7 @@ function Analytics() {
           <h2 className="text-4xl font-black text-green-600 tracking-tighter">₹{currentMonthRegular}</h2>
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-orange-500 hover:scale-105 transition">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">PRO Plans Revenue (Current Month)</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">PRO {config.planLabel} Revenue (Current Month)</p>
           <h2 className="text-4xl font-black text-orange-600 tracking-tighter">₹{currentMonthPro}</h2>
         </div>
         <div className="bg-slate-800 p-6 rounded-3xl shadow-xl border-t-8 border-yellow-400 hover:scale-105 transition text-white">
@@ -152,14 +153,14 @@ function Analytics() {
       <div className="max-w-7xl mx-auto mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-indigo-100 p-8 rounded-3xl border-2 border-indigo-200 flex justify-between items-center shadow-md">
           <div>
-            <p className="font-black text-indigo-900 uppercase tracking-widest text-xs mb-1">Students Joined (This Month)</p>
+            <p className="font-black text-indigo-900 uppercase tracking-widest text-xs mb-1">{config.userTypePlural} Joined (This Month)</p>
             <h3 className="text-5xl font-black text-indigo-700">+{data.stats?.new_joining || 0}</h3>
           </div>
           <span className="text-6xl drop-shadow-md">📈</span>
         </div>
         <div className="bg-red-100 p-8 rounded-3xl border-2 border-red-200 flex justify-between items-center shadow-md">
           <div>
-            <p className="font-black text-red-900 uppercase tracking-widest text-xs mb-1">Student Exits (Inactive > 30 Days)</p>
+            <p className="font-black text-red-900 uppercase tracking-widest text-xs mb-1">{config.userType} Exits (Inactive &gt; 30 Days)</p>
             <h3 className="text-5xl font-black text-red-700">-{data.stats?.exits || 0}</h3>
           </div>
           <span className="text-6xl drop-shadow-md">📉</span>
@@ -171,7 +172,7 @@ function Analytics() {
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b-2 border-slate-100 pb-6">
           <div>
             <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Pending Fees Alert ⚠️</h2>
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{pendingStudents.length} Students Pending</p>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{pendingStudents.length} {config.userTypePlural} Pending</p>
           </div>
           <button onClick={sendBulkReminders} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl hover:bg-green-700 transition flex items-center gap-3 uppercase active:scale-95">
             <span className="text-2xl">📲</span> Send Bulk Reminders
@@ -182,7 +183,7 @@ function Analytics() {
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest sticky top-0">
               <tr>
-                <th className="p-4 border-b">Student Name</th>
+                <th className="p-4 border-b">{config.userType} Name</th>
                 <th className="p-4 border-b">Contact</th>
                 <th className="p-4 border-b text-right">Pending Dues</th>
               </tr>
