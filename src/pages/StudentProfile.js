@@ -80,7 +80,6 @@ function StudentProfile() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
               <p><strong>📞 Mobile:</strong> {student.mobile || 'N/A'}</p>
               <p><strong>💬 WhatsApp:</strong> {student.whatsapp || 'N/A'}</p>
-              <p><strong>💳 Aadhaar:</strong> {student.aadhaar_no || 'N/A'}</p>
               <p><strong>🆔 Student ID:</strong> #LAXMI-{student.id}</p>
             </div>
           </div>
