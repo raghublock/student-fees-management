@@ -148,7 +148,23 @@ function Dashboard() {
           <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-500 text-white px-4 py-2 rounded font-bold hover:bg-red-600 shadow-md">Logout</button>
         </div>
       </div>
-      
+        {/* Header Section */}
+<div className="flex justify-between items-center max-w-7xl mx-auto mb-6 bg-white p-4 rounded-lg shadow-sm border-b-4 border-indigo-700">
+  <div>
+    <h1 className="text-3xl font-black text-indigo-900">Laxmi Library 📚</h1>
+    <p className="text-gray-500 font-medium italic">Bikaner Branch | Welcome, {adminName || 'Admin'}</p>
+  </div>
+  <div className="flex flex-col md:flex-row gap-2">
+    {/* 📦 Naya Plans Button */}
+    <Link to="/plans" className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-600 shadow-md text-center transition flex items-center gap-2">
+      <span>📦</span> Plans Manager
+    </Link>
+    
+    <Link to="/fees" className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 shadow-md text-center transition">Fees Dashboard 💰</Link>
+    
+    <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 shadow-md transition">Logout</button>
+  </div>
+</div>
       {/* Input Form Section */}
       <div className={`max-w-7xl mx-auto bg-white p-6 rounded-xl shadow-md mb-8 border-l-8 ${editingId ? 'border-yellow-500 bg-yellow-50' : 'border-blue-600'}`}>
         <h2 className="text-xl font-bold mb-4 text-gray-700 underline">
