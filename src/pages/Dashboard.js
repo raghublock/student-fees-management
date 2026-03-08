@@ -5,9 +5,10 @@ import toast from 'react-hot-toast';
 function Dashboard() {
   const [students, setStudents] = useState([]);
   
+  // Aadhaar_no yahan se hata diya gaya hai 🛡️
   const [formData, setFormData] = useState({ 
     name: '', total_fees: '', paid_fees: '', extra_fees: '', 
-    mobile: '', whatsapp: '', email: '', aadhaar_no: '', photo: '' 
+    mobile: '', whatsapp: '', email: '', photo: '' 
   });
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +37,6 @@ function Dashboard() {
     else fetchStudents(); 
   }, [navigate, token]);
 
-  // 🚀 UPDATE: Automatic Image Compressor (Max 50KB-100KB Logic)
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -47,20 +47,15 @@ function Dashboard() {
             img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                
-                // Photo ki width 400px fix kar di (Size kam karne ke liye)
                 const MAX_WIDTH = 400; 
                 const scaleSize = MAX_WIDTH / img.width;
                 canvas.width = MAX_WIDTH;
                 canvas.height = img.height * scaleSize;
-
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                // JPEG format aur 0.6 quality (Bahut kam size mein acchi photo)
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                 setFormData({ ...formData, photo: dataUrl });
-                toast.success("Photo optimized successfully!");
+                toast.success("Photo optimized!");
             };
         };
     }
@@ -82,30 +77,24 @@ function Dashboard() {
         body: JSON.stringify({ ...formData, total_fees: total, paid_fees: paid, due_fees: due })
       });
       
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        toast.error(`Error: ${responseData.error || "Data save nahi hua"}`);
-        return;
+      if (response.ok) {
+        setFormData({ name: '', total_fees: '', paid_fees: '', extra_fees: '', mobile: '', whatsapp: '', email: '', photo: '' });
+        setEditingId(null); 
+        toast.success(editingId ? "Data Updated! ✏️" : "Student Saved! ✅");
+        fetchStudents(); 
       }
-
-      setFormData({ name: '', total_fees: '', paid_fees: '', extra_fees: '', mobile: '', whatsapp: '', email: '', aadhaar_no: '', photo: '' });
-      setEditingId(null); 
-      
-      toast.success(editingId ? "Data Update Ho Gaya! ✏️" : "Student Save Ho Gaya! ✅");
-      fetchStudents(); 
     } catch (error) {
-      toast.error("Network problem. Check connection.");
+      toast.error("Network problem.");
     }
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm("Kya aap is student ka record mitaana chahte hain?")) {
+    if(window.confirm("Record mitaana chahte hain?")) {
       await fetch(`${API_URL}/api/student/delete/${id}`, { 
         method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
       });
       fetchStudents();
-      toast.success("Record hata diya gaya!");
+      toast.success("Hata diya gaya!");
     }
   };
 
@@ -124,11 +113,6 @@ function Dashboard() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setFormData({ name: '', total_fees: '', paid_fees: '', extra_fees: '', mobile: '', whatsapp: '', email: '', aadhaar_no: '', photo: '' });
-  };
-
   const filteredStudents = students.filter(s => {
     const matchName = s.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchPending = showPendingOnly ? (s.due_fees > 0) : true;
@@ -136,139 +120,116 @@ function Dashboard() {
   });
 
   return (
-    <div className="p-4 bg-slate-100 min-h-screen font-sans">
-      {/* Header Section */}
-      <div className="flex justify-between items-center max-w-7xl mx-auto mb-6 bg-white p-4 rounded-lg shadow-sm border-b-4 border-blue-600">
+    <div className="p-4 bg-slate-50 min-h-screen font-sans">
+      {/* 🚀 Header Section Updated with Plans Manager Button */}
+      <div className="flex justify-between items-center max-w-7xl mx-auto mb-8 bg-white p-5 rounded-xl shadow-md border-b-4 border-indigo-700 transition-all">
         <div>
-          <h1 className="text-3xl font-bold text-blue-900 text-center md:text-left">Library Student Manager 🎓</h1>
-          <p className="text-gray-500 font-medium">Bikaner Branch | Welcome, {adminName || 'Admin'}</p>
+          <h1 className="text-3xl font-black text-indigo-900">Laxmi Library 📚</h1>
+          <p className="text-gray-500 font-bold italic">Bikaner Branch | Welcome, {adminName || 'Admin'}</p>
         </div>
-        <div className="flex flex-col md:flex-row gap-2">
-          <Link to="/fees" className="bg-green-500 text-white px-4 py-2 rounded font-bold hover:bg-green-600 transition shadow-md text-center">Fees Dashboard 💰</Link>
-          <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-500 text-white px-4 py-2 rounded font-bold hover:bg-red-600 shadow-md">Logout</button>
+        <div className="flex flex-col md:flex-row gap-3">
+          <Link to="/plans" className="bg-orange-500 text-white px-5 py-2 rounded-lg font-bold hover:bg-orange-600 shadow-lg border-b-4 border-orange-800 transition active:scale-95 flex items-center gap-2">
+            <span>📦</span> Plans Manager
+          </Link>
+          <Link to="/fees" className="bg-green-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-green-700 shadow-lg border-b-4 border-green-800 transition">
+            <span>💰</span> Fees Dashboard
+          </Link>
+          <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-500 text-white px-5 py-2 rounded-lg font-bold hover:bg-red-600 shadow-lg border-b-4 border-red-700 transition">
+            Logout
+          </button>
         </div>
       </div>
-        {/* Header Section */}
-<div className="flex justify-between items-center max-w-7xl mx-auto mb-6 bg-white p-4 rounded-lg shadow-sm border-b-4 border-indigo-700">
-  <div>
-    <h1 className="text-3xl font-black text-indigo-900">Laxmi Library 📚</h1>
-    <p className="text-gray-500 font-medium italic">Bikaner Branch | Welcome, {adminName || 'Admin'}</p>
-  </div>
-  <div className="flex flex-col md:flex-row gap-2">
-    {/* 📦 Naya Plans Button */}
-    <Link to="/plans" className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-600 shadow-md text-center transition flex items-center gap-2">
-      <span>📦</span> Plans Manager
-    </Link>
-    
-    <Link to="/fees" className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 shadow-md text-center transition">Fees Dashboard 💰</Link>
-    
-    <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 shadow-md transition">Logout</button>
-  </div>
-</div>
-      {/* Input Form Section */}
-      <div className={`max-w-7xl mx-auto bg-white p-6 rounded-xl shadow-md mb-8 border-l-8 ${editingId ? 'border-yellow-500 bg-yellow-50' : 'border-blue-600'}`}>
-        <h2 className="text-xl font-bold mb-4 text-gray-700 underline">
-          {editingId ? "✏️ Update Student Information" : "➕ Add New Student"}
+
+      {/* Form Section - Aadhaar Input Removed */}
+      <div className={`max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-t-8 ${editingId ? 'border-yellow-500 bg-yellow-50' : 'border-indigo-600'}`}>
+        <h2 className="text-xl font-black mb-6 text-gray-800 uppercase tracking-wider">
+          {editingId ? "✏️ Update Student" : "➕ Add New Student"}
         </h2>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input type="text" placeholder="Student Name" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
-          <input type="text" placeholder="Mobile Number" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} />
-          <input type="text" placeholder="WhatsApp Number" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.whatsapp} onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} />
+          <input type="text" placeholder="Student Name" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
+          <input type="text" placeholder="Mobile Number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} />
+          <input type="text" placeholder="WhatsApp Number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.whatsapp} onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} />
           
-          <div className="flex flex-col border p-2 rounded bg-gray-50">
-            <label className="text-xs font-bold text-gray-500 mb-1">Click/Upload Photo</label>
+          <div className="flex flex-col border-2 p-2 rounded-xl bg-gray-50 border-dashed border-indigo-200">
+            <label className="text-[10px] font-black text-indigo-400 mb-1 uppercase">Student Photo</label>
             <div className="flex items-center gap-2">
-              <input 
-                type="file" 
-                accept="image/*" 
-                capture="environment" 
-                className="text-xs w-full cursor-pointer" 
-                onChange={handlePhotoChange} 
-              />
-              {formData.photo && <img src={formData.photo} alt="Preview" className="h-10 w-10 rounded-full border border-blue-400 object-cover" />}
+              <input type="file" accept="image/*" className="text-[10px] w-full cursor-pointer" onChange={handlePhotoChange} />
+              {formData.photo && <img src={formData.photo} alt="Preview" className="h-10 w-10 rounded-full border-2 border-indigo-500 object-cover shadow-sm" />}
             </div>
           </div>
 
-          <input type="number" placeholder="Total Fees" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required />
-          <input type="number" placeholder="Paid Fees" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
-          <input type="number" placeholder="Extra Fees" className="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-400" value={formData.extra_fees} onChange={(e) => setFormData({...formData, extra_fees: e.target.value})} />
+          <input type="number" placeholder="Total Fees (₹)" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required />
+          <input type="number" placeholder="Paid Fees (₹)" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
+          <input type="number" placeholder="Extra (Optional)" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.extra_fees} onChange={(e) => setFormData({...formData, extra_fees: e.target.value})} />
           
-          <div className="md:col-span-1 flex gap-2">
-            <button type="submit" className={`flex-1 text-white font-bold py-2 rounded transition shadow-lg ${editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-800'}`}>
-              {editingId ? "Update Data" : "Add Student"}
-            </button>
-            {editingId && (
-              <button type="button" onClick={cancelEdit} className="bg-gray-400 text-white font-bold py-2 px-4 rounded hover:bg-gray-500 shadow-lg">Cancel</button>
-            )}
-          </div>
+          <button type="submit" className={`text-white font-black py-3 rounded-xl shadow-xl transition-all ${editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-indigo-600 hover:bg-indigo-800'}`}>
+            {editingId ? "SAVE CHANGES" : "REGISTER STUDENT"}
+          </button>
         </form>
       </div>
 
-      {/* Search Bar */}
-      <div className="max-w-7xl mx-auto bg-blue-50 p-4 rounded-t-lg border border-blue-200 flex flex-wrap gap-4 items-center justify-between">
-        <input 
-          type="text" 
-          placeholder="🔍 Search Student..." 
-          className="border p-2 rounded w-full max-w-xs shadow-sm outline-none focus:ring-2 focus:ring-blue-500"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <label className="flex items-center space-x-2 bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold cursor-pointer hover:bg-red-200 transition">
+      {/* Search & Pending Filter */}
+      <div className="max-w-7xl mx-auto flex flex-wrap gap-4 items-center justify-between mb-4">
+        <div className="relative w-full max-w-md">
           <input 
-            type="checkbox" 
-            className="form-checkbox h-5 w-5 text-red-600"
-            checked={showPendingOnly}
-            onChange={(e) => setShowPendingOnly(e.target.checked)}
+            type="text" 
+            placeholder="🔍 Search Student..." 
+            className="border-2 p-3 pl-10 rounded-2xl w-full shadow-sm outline-none focus:border-indigo-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <span>Dues Pending Only</span>
+        </div>
+        <label className="flex items-center space-x-3 bg-red-100 text-red-700 px-6 py-3 rounded-2xl font-black cursor-pointer hover:bg-red-200 transition shadow-sm border-b-4 border-red-300">
+          <input type="checkbox" className="h-5 w-5 rounded" checked={showPendingOnly} onChange={(e) => setShowPendingOnly(e.target.checked)} />
+          <span>DUES PENDING ONLY</span>
         </label>
       </div>
 
       {/* Data Table */}
-      <div className="max-w-7xl mx-auto bg-white rounded-b-lg shadow-xl overflow-x-auto border-x border-b border-gray-200">
-        <table className="w-full text-sm">
-          <thead className="bg-blue-700 text-white font-bold">
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+        <table className="w-full text-left">
+          <thead className="bg-slate-800 text-white">
             <tr>
-              <th className="p-3 text-left border-b border-blue-800">Photo</th>
-              <th className="p-3 text-left border-b border-blue-800">Name</th>
-              <th className="p-3 text-left border-b border-blue-800">Contact</th>
-              <th className="p-3 text-left border-b border-blue-800">Fees (T/P/D)</th>
-              <th className="p-3 text-center border-b border-blue-800">Actions</th>
+              <th className="p-4 text-xs font-black uppercase">Identity</th>
+              <th className="p-4 text-xs font-black uppercase">Name</th>
+              <th className="p-4 text-xs font-black uppercase">Contact</th>
+              <th className="p-4 text-xs font-black uppercase">Financials</th>
+              <th className="p-4 text-xs font-black uppercase text-center">Manage</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-100">
             {filteredStudents.map(s => (
-              <tr key={s.id} className="hover:bg-blue-50 transition-colors">
-                <td className="p-3">
+              <tr key={s.id} className="hover:bg-indigo-50/50 transition-colors">
+                <td className="p-4">
                   {s.photo ? (
-                    <img src={s.photo} alt="Student" className="h-12 w-12 rounded-full object-cover border-2 border-blue-200 shadow-sm" />
+                    <img src={s.photo} alt="Student" className="h-14 w-14 rounded-2xl object-cover border-2 border-white shadow-md" />
                   ) : (
-                    <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-[10px] border border-gray-300">No Image</div>
+                    <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-400 border border-slate-200 uppercase">No Photo</div>
                   )}
                 </td>
-                <td className="p-3 text-left font-bold text-blue-900 text-lg">{s.name}</td>
-                <td className="p-3 text-left text-gray-700 font-medium text-xs">
-                   📞 {s.mobile || '-'} <br/>
-                   }
+                <td className="p-4 font-black text-slate-800 text-lg uppercase">{s.name}</td>
+                <td className="p-4 text-xs font-bold text-slate-500">
+                   📱 {s.mobile || 'N/A'} <br/>
+                   🟢 {s.whatsapp || 'N/A'}
                 </td>
-                <td className="p-3 text-left">
-                  <span className="text-gray-600 font-medium">Total: ₹{s.total_fees || 0}</span> <br/>
-                  <span className="text-green-600 font-bold">Paid: ₹{s.paid_fees || 0}</span> <br/>
-                  <span className={`font-bold ${s.due_fees > 0 ? 'text-red-600' : 'text-gray-500'}`}>Due: ₹{s.due_fees || 0}</span>
+                <td className="p-4">
+                  <div className="text-[10px] font-bold text-slate-400">TOTAL: ₹{s.total_fees}</div>
+                  <div className="text-sm font-black text-green-600 underline">PAID: ₹{s.paid_fees}</div>
+                  <div className={`text-sm font-black ${s.due_fees > 0 ? 'text-red-600 bg-red-50 rounded px-1' : 'text-slate-400'}`}>
+                    DUE: ₹{s.due_fees || 0}
+                  </div>
                 </td>
-                <td className="p-3 text-center space-x-1 flex justify-center items-center h-full pt-6">
-                  <Link to={`/student/${s.id}`} className="bg-indigo-500 text-white px-2 py-2 rounded text-[10px] font-bold shadow-sm hover:bg-indigo-600 transition">Profile</Link>
-                  <button onClick={() => handleEdit(s)} className="bg-yellow-500 text-white px-2 py-2 rounded text-[10px] font-bold shadow-sm hover:bg-yellow-600 transition">Edit</button>
-                  <a href={`https://wa.me/91${s.whatsapp}?text=Namaste%20${s.name},%20aapki%20due%20fees%20₹${s.due_fees}%20hai.`} 
+                <td className="p-4 flex gap-2 justify-center items-center mt-4">
+                  <button onClick={() => handleEdit(s)} className="bg-amber-100 text-amber-700 p-2 rounded-lg font-black hover:bg-amber-200 transition text-[10px]">EDIT</button>
+                  <a href={`https://wa.me/91${s.whatsapp}?text=Laxmi%20Library%20Bikaner%3A%20Namaste%20${s.name}%2C%20aapki%20DUE%20FEES%20₹${s.due_fees}%20hai.`} 
                      target="_blank" rel="noreferrer" 
-                     className="bg-green-500 text-white px-2 py-2 rounded text-[10px] font-bold shadow-sm hover:bg-green-600 transition">WA</a>
-                  <button onClick={() => handleDelete(s.id)} className="bg-red-500 text-white px-2 py-2 rounded text-[10px] font-bold shadow-sm hover:bg-red-600 transition">Del</button>
+                     className="bg-green-100 text-green-700 p-2 rounded-lg font-black hover:bg-green-200 transition text-[10px]">NOTICE</a>
+                  <button onClick={() => handleDelete(s.id)} className="bg-red-100 text-red-700 p-2 rounded-lg font-black hover:bg-red-200 transition text-[10px]">REMOVE</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {filteredStudents.length === 0 && <p className="text-center p-10 text-gray-500 font-medium">No records found.</p>}
       </div>
     </div>
   );
