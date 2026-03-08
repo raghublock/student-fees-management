@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 function Dashboard() {
   const [students, setStudents] = useState([]);
   
-  // Aadhaar_no yahan se hata diya gaya hai 🛡️
   const [formData, setFormData] = useState({ 
     name: '', total_fees: '', paid_fees: '', extra_fees: '', 
     mobile: '', whatsapp: '', email: '', photo: '' 
@@ -121,7 +120,7 @@ function Dashboard() {
 
   return (
     <div className="p-4 bg-slate-50 min-h-screen font-sans">
-      {/* 🚀 Header Section Updated with Plans Manager Button */}
+      {/* Header Section */}
       <div className="flex justify-between items-center max-w-7xl mx-auto mb-8 bg-white p-5 rounded-xl shadow-md border-b-4 border-indigo-700 transition-all">
         <div>
           <h1 className="text-3xl font-black text-indigo-900">Laxmi Library 📚</h1>
@@ -140,15 +139,15 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Form Section - Aadhaar Input Removed */}
+      {/* Form Section */}
       <div className={`max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-t-8 ${editingId ? 'border-yellow-500 bg-yellow-50' : 'border-indigo-600'}`}>
         <h2 className="text-xl font-black mb-6 text-gray-800 uppercase tracking-wider">
           {editingId ? "✏️ Update Student" : "➕ Add New Student"}
         </h2>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <input type="text" placeholder="Student Name" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
-          <input type="text" placeholder="Mobile Number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} />
-          <input type="text" placeholder="WhatsApp Number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.whatsapp} onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} />
+          <input type="text" placeholder="Mobile" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} />
+          <input type="text" placeholder="WhatsApp" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.whatsapp} onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} />
           
           <div className="flex flex-col border-2 p-2 rounded-xl bg-gray-50 border-dashed border-indigo-200">
             <label className="text-[10px] font-black text-indigo-400 mb-1 uppercase">Student Photo</label>
@@ -158,9 +157,9 @@ function Dashboard() {
             </div>
           </div>
 
-          <input type="number" placeholder="Total Fees (₹)" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required />
-          <input type="number" placeholder="Paid Fees (₹)" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
-          <input type="number" placeholder="Extra (Optional)" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.extra_fees} onChange={(e) => setFormData({...formData, extra_fees: e.target.value})} />
+          <input type="number" placeholder="Total Fees" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required />
+          <input type="number" placeholder="Paid Fees" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
+          <input type="number" placeholder="Extra" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none" value={formData.extra_fees} onChange={(e) => setFormData({...formData, extra_fees: e.target.value})} />
           
           <button type="submit" className={`text-white font-black py-3 rounded-xl shadow-xl transition-all ${editingId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-indigo-600 hover:bg-indigo-800'}`}>
             {editingId ? "SAVE CHANGES" : "REGISTER STUDENT"}
@@ -168,17 +167,15 @@ function Dashboard() {
         </form>
       </div>
 
-      {/* Search & Pending Filter */}
+      {/* Search & Filter */}
       <div className="max-w-7xl mx-auto flex flex-wrap gap-4 items-center justify-between mb-4">
-        <div className="relative w-full max-w-md">
-          <input 
-            type="text" 
-            placeholder="🔍 Search Student..." 
-            className="border-2 p-3 pl-10 rounded-2xl w-full shadow-sm outline-none focus:border-indigo-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        <input 
+          type="text" 
+          placeholder="🔍 Search Student..." 
+          className="border-2 p-3 rounded-2xl w-full max-w-md shadow-sm outline-none focus:border-indigo-500"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
         <label className="flex items-center space-x-3 bg-red-100 text-red-700 px-6 py-3 rounded-2xl font-black cursor-pointer hover:bg-red-200 transition shadow-sm border-b-4 border-red-300">
           <input type="checkbox" className="h-5 w-5 rounded" checked={showPendingOnly} onChange={(e) => setShowPendingOnly(e.target.checked)} />
           <span>DUES PENDING ONLY</span>
@@ -192,8 +189,6 @@ function Dashboard() {
             <tr>
               <th className="p-4 text-xs font-black uppercase">Identity</th>
               <th className="p-4 text-xs font-black uppercase">Name</th>
-              <th className="p-4 text-xs font-black uppercase">Contact</th>
-              <th className="p-4 text-xs font-black uppercase">Financials</th>
               <th className="p-4 text-xs font-black uppercase text-center">Manage</th>
             </tr>
           </thead>
@@ -207,24 +202,28 @@ function Dashboard() {
                     <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-400 border border-slate-200 uppercase">No Photo</div>
                   )}
                 </td>
-                <td className="p-4 font-black text-slate-800 text-lg uppercase">{s.name}</td>
-                <td className="p-4 text-xs font-bold text-slate-500">
-                   📱 {s.mobile || 'N/A'} <br/>
-                   🟢 {s.whatsapp || 'N/A'}
+                <td className="p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-slate-800 text-lg uppercase">{s.name}</span>
+                    {/* ⭐ PRO Student Tag Logic */}
+                    {s.has_active_plan && (
+                      <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black shadow-sm animate-pulse border border-yellow-200">
+                        PRO STUDENT
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-slate-500 mt-1">📱 {s.mobile || 'N/A'}</div>
                 </td>
                 <td className="p-4">
-                  <div className="text-[10px] font-bold text-slate-400">TOTAL: ₹{s.total_fees}</div>
-                  <div className="text-sm font-black text-green-600 underline">PAID: ₹{s.paid_fees}</div>
-                  <div className={`text-sm font-black ${s.due_fees > 0 ? 'text-red-600 bg-red-50 rounded px-1' : 'text-slate-400'}`}>
-                    DUE: ₹{s.due_fees || 0}
-                  </div>
-                </td>
-                <td className="p-4 flex gap-2 justify-center items-center mt-4">
-                  <button onClick={() => handleEdit(s)} className="bg-amber-100 text-amber-700 p-2 rounded-lg font-black hover:bg-amber-200 transition text-[10px]">EDIT</button>
-                  <a href={`https://wa.me/91${s.whatsapp}?text=Laxmi%20Library%20Bikaner%3A%20Namaste%20${s.name}%2C%20aapki%20DUE%20FEES%20₹${s.due_fees}%20hai.`} 
-                     target="_blank" rel="noreferrer" 
-                     className="bg-green-100 text-green-700 p-2 rounded-lg font-black hover:bg-green-200 transition text-[10px]">NOTICE</a>
-                  <button onClick={() => handleDelete(s.id)} className="bg-red-100 text-red-700 p-2 rounded-lg font-black hover:bg-red-200 transition text-[10px]">REMOVE</button>
+                   <div className="flex gap-2 justify-center flex-wrap">
+                      {/* 👤 Profile Button Wapas Aa Gaya */}
+                      <Link to={`/student/${s.id}`} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-black hover:bg-indigo-700 transition text-[10px] shadow-md">
+                        PROFILE
+                      </Link>
+                      <button onClick={() => handleEdit(s)} className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg font-black hover:bg-amber-200 transition text-[10px]">EDIT</button>
+                      <a href={`https://wa.me/91${s.whatsapp}?text=Namaste%20${s.name}`} target="_blank" rel="noreferrer" className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-black text-[10px]">NOTICE</a>
+                      <button onClick={() => handleDelete(s.id)} className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-black hover:bg-red-200 transition text-[10px]">REMOVE</button>
+                   </div>
                 </td>
               </tr>
             ))}
