@@ -55,11 +55,11 @@ function Dashboard() {
     data.append('file', file);
     
     // ⚠️ DHYAN DEIN: Yahan apna Preset Name daalein (Jaise: gym_preset)
-    data.append('upload_preset', 'YOUR_UPLOAD_PRESET_HERE'); 
+    data.append('upload_preset', 'gym_preset'); 
 
     try {
       // ⚠️ DHYAN DEIN: URL mein YOUR_CLOUD_NAME ko apne Cloudinary naam se badlein
-      const res = await fetch('https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload', {
+      const res = await fetch('https://api.cloudinary.com/v1_1/doaodzwor/image/upload', {
         method: 'POST',
         body: data
       });
