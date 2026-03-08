@@ -1,28 +1,48 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import FeesDashboard from './pages/FeesDashboard';
-import StudentProfile from './pages/StudentProfile'; // 👈 Ye import check karein
-import PlanPurchase from './pages/PlanPurchase';
 
-const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('adminToken');
-  return token ? children : <Navigate to="/" />;
-};
+// Saare pages import kar rahe hain
+import Login from './pages/Login'; 
+import Dashboard from './pages/Dashboard';
+import StudentProfile from './pages/StudentProfile';
+import PlanPurchase from './pages/PlanPurchase';
+import Analytics from './pages/Analytics';
+
+// Agar FeesDashboard ka alag page hai toh usko bhi yahan import karna 
+// import FeesDashboard from './pages/FeesDashboard';
 
 function App() {
   return (
     <Router>
-      <Toaster position="top-right" />
+      {/* Notifications ke liye Toaster */}
+      <Toaster 
+        position="top-center" 
+        toastOptions={{ 
+          duration: 3000,
+          style: { fontWeight: 'bold', borderRadius: '10px' } 
+        }} 
+      />
+      
       <Routes>
+        {/* Login Page Route */}
         <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/fees" element={<ProtectedRoute><FeesDashboard /></ProtectedRoute>} /> 
+        
+        {/* Main Dashboard Route */}
+        <Route path="/dashboard" element={<Dashboard />} />
+        
+        {/* Custom Plans Manager Route */}
         <Route path="/plans" element={<PlanPurchase />} />
-        {/* 🚀 YEH LINE HAI ASLEE SOLUTION: Dashboard ke Link ko yahan se rasta milta hai */}
-        <Route path="/student/:id" element={<ProtectedRoute><StudentProfile /></ProtectedRoute>} /> 
+        
+        {/* Student Profile Route (ID dynamic pass hoti hai) */}
+        <Route path="/student/:id" element={<StudentProfile />} />
+        
+        {/* 📊 Naya Analytics & Revenue Route */}
+        <Route path="/analytics" element={<Analytics />} />
+
+        {/* Agar Fees ka alag page hai toh isey uncomment karein: */}
+        {/* <Route path="/fees" element={<FeesDashboard />} /> */}
+        
       </Routes>
     </Router>
   );
