@@ -120,19 +120,28 @@ function Dashboard() {
 
   return (
     <div className="p-4 bg-slate-50 min-h-screen font-sans">
-      {/* Header Section */}
-      <div className="flex justify-between items-center max-w-7xl mx-auto mb-8 bg-white p-5 rounded-xl shadow-md border-b-4 border-indigo-700 transition-all">
+      
+      {/* 🚀 Header Section - Analytics Button Added Here */}
+      <div className="flex justify-between items-center max-w-7xl mx-auto mb-8 bg-white p-5 rounded-xl shadow-md border-b-4 border-indigo-700 transition-all flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-black text-indigo-900">Laxmi Library 📚</h1>
           <p className="text-gray-500 font-bold italic">Bikaner Branch | Welcome, {adminName || 'Admin'}</p>
         </div>
-        <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex flex-wrap gap-3">
+          
+          {/* 📊 NEW: Analytics Button */}
+          <Link to="/analytics" className="bg-slate-800 text-white px-5 py-2 rounded-lg font-bold hover:bg-black shadow-lg border-b-4 border-slate-600 transition active:scale-95 flex items-center gap-2">
+            <span>📊</span> Analytics
+          </Link>
+
           <Link to="/plans" className="bg-orange-500 text-white px-5 py-2 rounded-lg font-bold hover:bg-orange-600 shadow-lg border-b-4 border-orange-800 transition active:scale-95 flex items-center gap-2">
             <span>📦</span> Plans Manager
           </Link>
-          <Link to="/fees" className="bg-green-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-green-700 shadow-lg border-b-4 border-green-800 transition">
+          
+          <Link to="/fees" className="bg-green-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-green-700 shadow-lg border-b-4 border-green-800 transition flex items-center gap-2">
             <span>💰</span> Fees Dashboard
           </Link>
+          
           <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-500 text-white px-5 py-2 rounded-lg font-bold hover:bg-red-600 shadow-lg border-b-4 border-red-700 transition">
             Logout
           </button>
@@ -205,7 +214,6 @@ function Dashboard() {
                 <td className="p-4">
                   <div className="flex items-center gap-2">
                     <span className="font-black text-slate-800 text-lg uppercase">{s.name}</span>
-                    {/* ⭐ PRO Student Tag Logic */}
                     {s.has_active_plan && (
                       <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black shadow-sm animate-pulse border border-yellow-200">
                         PRO STUDENT
@@ -216,7 +224,6 @@ function Dashboard() {
                 </td>
                 <td className="p-4">
                    <div className="flex gap-2 justify-center flex-wrap">
-                      {/* 👤 Profile Button Wapas Aa Gaya */}
                       <Link to={`/student/${s.id}`} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-black hover:bg-indigo-700 transition text-[10px] shadow-md">
                         PROFILE
                       </Link>
