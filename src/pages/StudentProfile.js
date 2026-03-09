@@ -50,12 +50,12 @@ function StudentProfile() {
 
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
+  // 🗓️ Expiry Date Logic
   let expiryDisplay = 'N/A';
   let latestPayment = null;
   
   if (paymentHistory.length > 0) {
       latestPayment = paymentHistory[0]; 
-      
       if (student.has_active_plan) {
           expiryDisplay = latestPayment.expiry_date 
             ? new Date(latestPayment.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
@@ -73,11 +73,50 @@ function StudentProfile() {
       }
   }
 
+  // 📊 NAYA JAADOO: Monthly Breakdown Calculation
+  const d = new Date();
+  const currentMonthName = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+  d.setMonth(d.getMonth() - 1);
+  const prevMonthName = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+
+  const currStats = { billed: 0, paid: 0 };
+  const prevStats = { billed: 0, paid: 0 };
+
+  if (!student.has_active_plan && paymentHistory.length > 0) {
+      paymentHistory.forEach(item => {
+          const amt = Number(item.amount || 0);
+          
+          // Current Month
+          if (item.month && item.month.includes(currentMonthName)) {
+              if (item.status === 'Billed') currStats.billed += amt;
+              else if (item.status === 'Paid') {
+                  currStats.paid += amt;
+                  // Handle old initial entries that didn't log "Billed" amount properly
+                  if (item.description?.includes('Initial') && currStats.billed === 0) {
+                      currStats.billed = Number(student.total_fees);
+                  }
+              }
+          }
+          
+          // Previous Month
+          if (item.month && item.month.includes(prevMonthName)) {
+              if (item.status === 'Billed') prevStats.billed += amt;
+              else if (item.status === 'Paid') {
+                  prevStats.paid += amt;
+                  if (item.description?.includes('Initial') && prevStats.billed === 0) {
+                      prevStats.billed = Number(student.total_fees);
+                  }
+              }
+          }
+      });
+  }
+
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
       
       <div className="print:hidden">
         
+        {/* Header */}
         <div className="max-w-5xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
             <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} {config.mainEmoji}</h1>
             <div className="flex gap-3">
@@ -87,6 +126,7 @@ function StudentProfile() {
         </div>
 
         <div className="max-w-5xl mx-auto">
+            {/* Profile Box */}
             <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
             <img 
                 src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} 
@@ -122,50 +162,66 @@ function StudentProfile() {
                 </div>
             </div>
 
-            <div className={`w-full md:w-72 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
-                <h3 className="text-xs font-black mb-4 border-b border-white/20 pb-2 uppercase tracking-widest italic">
-                    {student.has_active_plan ? 'Current Subscription' : 'Account Financials'}
-                </h3>
-                <div className="space-y-3 text-sm font-bold">
-                    <div className="flex justify-between opacity-80">
-                    <span>Total Fees:</span> 
-                    <span>₹{student.has_active_plan ? latestPayment?.price || '...' : student.total_fees}</span>
-                    </div>
-                    <div className="flex justify-between text-indigo-300">
-                    <span>Paid:</span> 
-                    <span>₹{student.has_active_plan ? latestPayment?.price || '...' : student.paid_fees}</span>
-                    </div>
-                    
-                    {!student.has_active_plan && (
-                    <div className="pt-2 mt-2 border-t border-white/20">
-                        {Number(student.due_fees) > 0 ? (
-                            <div className="flex justify-between text-red-400 text-xl font-black italic underline">
-                                <span>Due:</span> <span>₹{student.due_fees}</span>
-                            </div>
-                        ) : Number(student.due_fees) < 0 ? (
-                            <div className="flex justify-between text-green-400 text-xl font-black italic underline">
-                                <span>Advance:</span> <span>₹{Math.abs(student.due_fees)}</span>
-                            </div>
-                        ) : (
-                            <div className="flex justify-between text-green-400 text-lg font-black italic">
-                                <span>Status:</span> <span>✅ Cleared</span>
-                            </div>
-                        )}
-                    </div>
-                    )}
-
-                    <div className="pt-2 mt-2 border-t border-white/20">
-                        <div className="flex justify-between text-yellow-300 text-sm font-black uppercase tracking-wider">
-                            <span>Valid Till:</span> 
-                            <span>{expiryDisplay}</span>
+            {/* 🚀 NAYA JAADOO: Smart Financial Box */}
+            <div className={`w-full md:w-80 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
+                
+                {/* Due Amount Highlight */}
+                {!student.has_active_plan ? (
+                    <div className="flex justify-between items-center bg-slate-800 p-4 rounded-xl mb-4 border border-slate-700">
+                        <div>
+                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Total Due Now</p>
+                            <p className={`text-3xl font-black ${Number(student.due_fees) > 0 ? 'text-red-400 animate-pulse' : Number(student.due_fees) < 0 ? 'text-green-400' : 'text-white'}`}>
+                                {Number(student.due_fees) < 0 ? `+₹${Math.abs(student.due_fees)} (Adv)` : `₹${student.due_fees}`}
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Lifetime Paid</p>
+                            <p className="text-lg font-bold text-slate-300">₹{student.paid_fees}</p>
                         </div>
                     </div>
+                ) : (
+                    <div className="space-y-2 mb-4">
+                        <h3 className="text-xs font-black uppercase tracking-widest italic border-b border-white/20 pb-2">Plan Details</h3>
+                        <div className="flex justify-between"><span>Plan Fee:</span> <span>₹{latestPayment?.price || student.total_fees}</span></div>
+                        <div className="flex justify-between text-green-300"><span>Paid:</span> <span>₹{latestPayment?.price || student.paid_fees}</span></div>
+                    </div>
+                )}
 
+                {/* 📊 NAYA JAADOO: Monthly Breakdown */}
+                {!student.has_active_plan && (
+                    <div className="space-y-3">
+                        {/* Last Month */}
+                        <div className="flex justify-between items-center border-b border-slate-700 pb-2">
+                            <div>
+                                <p className="text-[9px] text-slate-400 uppercase tracking-widest">Last Month ({prevMonthName})</p>
+                                <p className="text-[11px] font-bold text-slate-300 mt-0.5">
+                                    Fee: <span className="text-white">₹{prevStats.billed}</span> | Paid: <span className="text-white">₹{prevStats.paid}</span>
+                                </p>
+                            </div>
+                        </div>
+                        {/* Current Month */}
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-[9px] text-indigo-300 uppercase tracking-widest">This Month ({currentMonthName})</p>
+                                <p className="text-sm font-black text-white mt-0.5">
+                                    Fee: ₹{currStats.billed} <span className="text-slate-500 mx-1">|</span> Paid: <span className="text-green-400">₹{currStats.paid}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Expiry Date */}
+                <div className="pt-3 mt-3 border-t border-white/20 text-center">
+                    <p className="text-yellow-300 text-xs font-black uppercase tracking-widest">
+                        Valid Till: {expiryDisplay}
+                    </p>
                 </div>
+
             </div>
             </div>
 
-            {/* 📒 NAYA JAADOO: Ledger Table (Passbook View) */}
+            {/* Ledger Table */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-800'} p-5 text-white font-black uppercase tracking-widest text-center text-sm`}>
                 {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 MONTHLY FEES PASSBOOK'}
@@ -195,17 +251,16 @@ function StudentProfile() {
                         )}
                     </td>
 
-                    {/* 🚀 NAYA LEDGER AMOUNT LOGIC (Red for Bill, Green for Paid) */}
                     <td className="p-5 font-black text-lg italic text-right">
                         {item.status === 'Billed' ? (
                             <span className="text-red-500">
                                 ⚠️ +₹{item.amount || item.price} <br/>
-                                <span className="text-[9px] text-gray-400 uppercase tracking-widest">Added to Due</span>
+                                <span className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Added to Due</span>
                             </span>
                         ) : (
                             <span className="text-green-600">
                                 ✅ ₹{item.amount || item.price} <br/>
-                                <span className="text-[9px] text-gray-400 uppercase tracking-widest">Amount Paid</span>
+                                <span className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Amount Paid</span>
                             </span>
                         )}
                     </td>
@@ -220,6 +275,9 @@ function StudentProfile() {
         </div>
       </div>
 
+      {/* ========================================================= */}
+      {/* 🖨️ PRINT VIEW (Normal screen par GAYAB, Print pe Dikhai dega) */}
+      {/* ========================================================= */}
       <div className="hidden print:block w-full max-w-3xl mx-auto bg-white text-black p-8 border-2 border-gray-800 outline-2 outline-offset-4 outline-black">
         <div className="flex justify-between items-end border-b-4 border-gray-800 pb-6 mb-6">
             <div>
@@ -275,8 +333,8 @@ function StudentProfile() {
         {!student.has_active_plan && Number(student.due_fees) > 0 && (
             <div className="flex justify-end mb-8">
                <div className="border-2 border-gray-800 p-3 w-64 flex justify-between bg-gray-100">
-                  <span className="font-black uppercase text-xs tracking-widest">Previous Due:</span>
-                  <span className="font-black">₹{student.due_fees}</span>
+                  <span className="font-black uppercase text-xs tracking-widest">Total Due Balance:</span>
+                  <span className="font-black text-xl">₹{student.due_fees}</span>
                </div>
             </div>
         )}
