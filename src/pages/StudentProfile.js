@@ -72,8 +72,10 @@ function StudentProfile() {
       }
   }
 
-  // 📊 SUPER SMART MONTH-WISE LOGIC (Sirf Mahine ka summary banayega)
+  // 📊 SUPER SMART MONTH-WISE LOGIC (Flawless Math Fix)
   const ledgerMap = {};
+  let totalBilledInHistory = 0; // Track karne ke liye ki kitna bill hume pata hai
+
   if (!student.has_active_plan && paymentHistory.length > 0) {
       paymentHistory.forEach(item => {
           const mStr = item.month || new Date(item.paid_on).toLocaleString('default', { month: 'short', year: 'numeric' });
@@ -86,6 +88,7 @@ function StudentProfile() {
               }
               if (item.status === 'Billed') {
                   ledgerMap[m].billed += amountPerMonth;
+                  totalBilledInHistory += amountPerMonth; // Count all explicit bills
               } else {
                   ledgerMap[m].paid += amountPerMonth;
               }
@@ -93,15 +96,19 @@ function StudentProfile() {
       });
   }
 
-  // Mahino ko List mein convert karke Naya Mahina sabse upar rakhna
+  // Naye mahine ko upar rakhne ke liye sort karna
   const monthlyPassbook = Object.values(ledgerMap).sort((a, b) => new Date(b.monthName) - new Date(a.monthName));
 
-  // Purani entries fix: Agar Billed 0 tha (purana code) par Paid kuch hai, toh usko System automatically Total Fees maan lega.
-  monthlyPassbook.forEach(m => {
-      if (m.billed === 0 && m.paid > 0) {
-          m.billed = Number(student.total_fees);
+  // 🚀 THE ULTIMATE FIX FOR LEGACY ENTRIES:
+  // Agar Total Fees (1600) humare Billed History (800) se zyada hai,
+  // toh iska matlab bacha hua 800 purane/pehle mahine ka bill tha jo add nahi hua.
+  if (!student.has_active_plan && monthlyPassbook.length > 0) {
+      const missingBilled = Number(student.total_fees) - totalBilledInHistory;
+      if (missingBilled > 0) {
+          // Sabse purana mahina array mein sabse aakhir mein hoga
+          monthlyPassbook[monthlyPassbook.length - 1].billed += missingBilled;
       }
-  });
+  }
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
@@ -153,7 +160,7 @@ function StudentProfile() {
                 </div>
             </div>
 
-            {/* Smart Financial Box (Ekdum accurate due aur advance) */}
+            {/* Smart Financial Box */}
             <div className={`w-full md:w-80 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
                 <h3 className="text-xs font-black mb-4 border-b border-white/20 pb-2 uppercase tracking-widest italic">
                     {student.has_active_plan ? 'Current Subscription' : 'Account Financials'}
@@ -162,12 +169,12 @@ function StudentProfile() {
                     
                     <div className="flex justify-between opacity-80">
                         <span>Lifetime Billed:</span> 
-                        <span>₹{student.has_active_plan ? latestPayment?.price || '...' : student.total_fees}</span>
+                        <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.total_fees}</span>
                     </div>
                     
                     <div className="flex justify-between text-green-400">
                         <span>Lifetime Paid:</span> 
-                        <span>₹{student.has_active_plan ? latestPayment?.price || '...' : student.paid_fees}</span>
+                        <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.paid_fees}</span>
                     </div>
                     
                     {!student.has_active_plan && (
@@ -199,7 +206,7 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* 📜 NAYI SINGLE TABLE: MONTH-WISE RECORD */}
+            {/* 📜 TABLE: MONTH-WISE SUMMARIZED PASSBOOK */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-700'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
                 {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} RECORD` : '📜 MONTHLY STATEMENT PASSBOOK'}
@@ -215,7 +222,6 @@ function StudentProfile() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                 {student.has_active_plan ? (
-                     // PRO Plans ke liye table
                      paymentHistory.length > 0 ? paymentHistory.map((item, idx) => (
                         <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
                             <td className="p-4 font-black text-indigo-900 text-xs text-left pl-6">{item.plan_name} <br/><span className="text-[9px] text-slate-400">{item.start_date}</span></td>
@@ -225,25 +231,21 @@ function StudentProfile() {
                         </tr>
                      )) : <tr><td colSpan="4" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
                 ) : (
-                    // 🚀 NAYA JAADOO: Regular Month-wise Rows
+                    // 🚀 NAYA JAADOO: Ab purane mahine ka billed amount change nahi hoga!
                     monthlyPassbook.length > 0 ? monthlyPassbook.map((row, idx) => {
-                        const balance = row.billed - row.paid;
+                        const balance = row.billed - row.paid; 
                         
                         return (
                         <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                            
                             <td className="p-4 font-black text-indigo-900 uppercase text-xs text-left pl-6">
                                 🗓️ {row.monthName}
                             </td>
-                            
                             <td className="p-4 font-bold text-slate-600 text-sm">
                                 ₹{row.billed}
                             </td>
-
                             <td className="p-4 font-black text-green-600 text-sm bg-green-50/20">
                                 ₹{row.paid}
                             </td>
-
                             <td className="p-4 text-right pr-6">
                                 {balance > 0 ? (
                                     <span className="text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 shadow-sm text-xs font-black">
@@ -259,7 +261,6 @@ function StudentProfile() {
                                     </span>
                                 )}
                             </td>
-
                         </tr>
                         );
                     }) : (
