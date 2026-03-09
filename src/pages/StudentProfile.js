@@ -72,9 +72,10 @@ function StudentProfile() {
       }
   }
 
-  // 📊 SUPER SMART MONTH-WISE LOGIC (Flawless Math Fix)
+  // 📊 SUPER SMART MONTH-WISE LOGIC (Ghost Data Fixed)
   const ledgerMap = {};
-  let totalBilledInHistory = 0; // Track karne ke liye ki kitna bill hume pata hai
+  let totalBilledInHistory = 0; 
+  let totalPaidInHistory = 0;
 
   if (!student.has_active_plan && paymentHistory.length > 0) {
       paymentHistory.forEach(item => {
@@ -88,25 +89,28 @@ function StudentProfile() {
               }
               if (item.status === 'Billed') {
                   ledgerMap[m].billed += amountPerMonth;
-                  totalBilledInHistory += amountPerMonth; // Count all explicit bills
+                  totalBilledInHistory += amountPerMonth;
               } else {
                   ledgerMap[m].paid += amountPerMonth;
+                  totalPaidInHistory += amountPerMonth;
               }
           });
       });
   }
 
-  // Naye mahine ko upar rakhne ke liye sort karna
   const monthlyPassbook = Object.values(ledgerMap).sort((a, b) => new Date(b.monthName) - new Date(a.monthName));
 
-  // 🚀 THE ULTIMATE FIX FOR LEGACY ENTRIES:
-  // Agar Total Fees (1600) humare Billed History (800) se zyada hai,
-  // toh iska matlab bacha hua 800 purane/pehle mahine ka bill tha jo add nahi hua.
-  if (!student.has_active_plan && monthlyPassbook.length > 0) {
+  // 🚀 THE ULTIMATE FIX: Agar purana balance bacha hai, toh usko alag dabe mein dikhao, current mahine ko kharab mat karo!
+  if (!student.has_active_plan) {
       const missingBilled = Number(student.total_fees) - totalBilledInHistory;
-      if (missingBilled > 0) {
-          // Sabse purana mahina array mein sabse aakhir mein hoga
-          monthlyPassbook[monthlyPassbook.length - 1].billed += missingBilled;
+      const missingPaid = Number(student.paid_fees) - totalPaidInHistory;
+      
+      if (missingBilled > 0 || missingPaid > 0) {
+          monthlyPassbook.push({
+              monthName: 'Purana / Initial Balance',
+              billed: missingBilled > 0 ? missingBilled : 0,
+              paid: missingPaid > 0 ? missingPaid : 0
+          });
       }
   }
 
@@ -231,14 +235,13 @@ function StudentProfile() {
                         </tr>
                      )) : <tr><td colSpan="4" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
                 ) : (
-                    // 🚀 NAYA JAADOO: Ab purane mahine ka billed amount change nahi hoga!
                     monthlyPassbook.length > 0 ? monthlyPassbook.map((row, idx) => {
                         const balance = row.billed - row.paid; 
                         
                         return (
-                        <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
+                        <tr key={idx} className={`hover:bg-slate-50 transition-all border-b ${row.monthName.includes('Purana') ? 'bg-amber-50/30' : ''}`}>
                             <td className="p-4 font-black text-indigo-900 uppercase text-xs text-left pl-6">
-                                🗓️ {row.monthName}
+                                {row.monthName.includes('Purana') ? '🕰️' : '🗓️'} {row.monthName}
                             </td>
                             <td className="p-4 font-bold text-slate-600 text-sm">
                                 ₹{row.billed}
