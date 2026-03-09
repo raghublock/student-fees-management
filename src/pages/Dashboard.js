@@ -15,6 +15,7 @@ function Dashboard() {
   const [showPendingOnly, setShowPendingOnly] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 🔒 FIX: Double Click Lock
 
   const currentMonthName = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
   const [formMonth, setFormMonth] = useState(currentMonthName);
@@ -129,7 +130,9 @@ function Dashboard() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isUploading) return toast.error("Pehle photo upload hone dein!");
+    if (isSubmitting) return; // 🔒 FIX: Agar process ho raha hai, toh roko
 
+    setIsSubmitting(true);
     const total = isProPlan ? Number(planPrice) : (Number(formData.total_fees) || 0);
     const paid = isProPlan ? Number(planPrice) : (Number(formData.paid_fees) || 0);
     const due = total - paid;
@@ -154,7 +157,6 @@ function Dashboard() {
             
             if(newStudent) {
                 studentIdForPlan = newStudent.id;
-                // 🚀 FIX: Ab chahe paise de ya na de (paid 0 ho), Initial Registration History zaroor banegi!
                 await fetch(`${API_URL}/api/fees/add`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -194,7 +196,11 @@ function Dashboard() {
         toast.success(editingId ? "Data Updated! ✏️" : `Saved & Activated! 📦✅`);
         fetchStudents(); 
       }
-    } catch (error) { toast.error("Network problem."); }
+    } catch (error) { 
+        toast.error("Network problem."); 
+    } finally {
+        setIsSubmitting(false); // 🔒 Unlock button
+    }
   };
 
   const handleQuickPay = async (e) => {
@@ -334,11 +340,9 @@ function Dashboard() {
           <p className="text-gray-500 font-bold text-sm uppercase tracking-widest">{config.branchName} | Admin: {adminName}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          
           <button onClick={() => setShowBillModal(true)} className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-black border border-indigo-200 hover:bg-indigo-200 transition text-sm shadow-sm flex items-center gap-1">
              🗓️ Auto-Bill (Month)
           </button>
-          
           <Link to="/analytics" className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold hover:bg-black shadow-md transition text-sm">📊 Analytics</Link>
           <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold hover:bg-red-100 transition text-sm border border-red-200">Logout</button>
         </div>
@@ -450,8 +454,8 @@ function Dashboard() {
              </div>
           )}
           
-          <button type="submit" disabled={isUploading} className={`md:col-span-5 text-white font-black py-4 mt-2 rounded-xl shadow-lg transition-all uppercase tracking-widest ${isUploading ? 'bg-slate-400' : editingId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-            {editingId ? "Save Changes" : isProPlan ? `Register & Activate PRO Plan 🚀` : `Register Profile`}
+          <button type="submit" disabled={isUploading || isSubmitting} className={`md:col-span-5 text-white font-black py-4 mt-2 rounded-xl shadow-lg transition-all uppercase tracking-widest ${(isUploading || isSubmitting) ? 'bg-slate-400 cursor-not-allowed' : editingId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+            {isSubmitting ? "Processing... ⏳" : editingId ? "Save Changes" : isProPlan ? `Register & Activate PRO Plan 🚀` : `Register Profile`}
           </button>
         </form>
       </div>
@@ -640,7 +644,6 @@ function Dashboard() {
         </div>
       )}
 
-      {/* 🚀 SMART AUTO-BILL MODAL */}
       {showBillModal && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all border-t-8 border-indigo-500">
