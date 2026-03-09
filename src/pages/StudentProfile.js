@@ -52,6 +52,8 @@ function StudentProfile() {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
+      
+      {/* Navigation Header */}
       <div className="max-w-5xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600 no-print">
         <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} {config.mainEmoji}</h1>
         <div className="flex gap-3">
@@ -61,12 +63,15 @@ function StudentProfile() {
       </div>
 
       <div id="printable-area" className="max-w-5xl mx-auto">
+        
+        {/* Profile Card Section */}
         <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
           <img 
             src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} 
             alt={config.userType} 
             className="h-44 w-44 rounded-3xl object-cover border-4 border-indigo-50 shadow-lg"
           />
+          
           <div className="flex-1 text-center md:text-left space-y-2">
             <div className="flex flex-col md:flex-row items-center gap-3 justify-center md:justify-start">
               <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">{student.name}</h2>
@@ -83,8 +88,20 @@ function StudentProfile() {
                 <p>📞 {student.mobile || 'N/A'}</p>
                 <p>🆔 {config.userType} ID: #{config.receiptPrefix}-{student.id}</p>
             </div>
+
+            {/* 🚀 NAYA JAADOO: Direct WhatsApp Button */}
+            <div className="pt-5 no-print">
+               <a 
+                 href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(Number(student.due_fees) > 0 ? `Namaste ${student.name}, Aapki ${config.appName} ki ₹${student.due_fees} fees due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka ${config.appName} ka account ekdum clear hai. Thank you!`)}`} 
+                 target="_blank" rel="noreferrer"
+                 className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2.5 rounded-xl font-black shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all uppercase tracking-widest text-xs"
+               >
+                 💬 Send WhatsApp Message
+               </a>
+            </div>
           </div>
 
+          {/* Dynamic Summary Box */}
           <div className={`w-full md:w-72 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
              <h3 className="text-xs font-black mb-4 border-b border-white/20 pb-2 uppercase tracking-widest italic">
                 {student.has_active_plan ? 'Current Subscription' : 'Account Financials'}
@@ -94,19 +111,35 @@ function StudentProfile() {
                   <span>Total Fees:</span> 
                   <span>₹{student.has_active_plan ? paymentHistory[0]?.price || '...' : student.total_fees}</span>
                 </div>
-                <div className="flex justify-between text-green-300">
+                <div className="flex justify-between text-indigo-300">
                   <span>Paid:</span> 
                   <span>₹{student.has_active_plan ? paymentHistory[0]?.price || '...' : student.paid_fees}</span>
                 </div>
+                
+                {/* 🚀 NAYA JAADOO: Smart Due / Advance Checker */}
                 {!student.has_active_plan && (
-                  <div className="pt-2 mt-2 border-t border-white/20 flex justify-between text-red-400 text-xl font-black italic underline">
-                    <span>Due:</span> <span>₹{student.due_fees}</span>
+                  <div className="pt-2 mt-2 border-t border-white/20">
+                    {Number(student.due_fees) > 0 ? (
+                        <div className="flex justify-between text-red-400 text-xl font-black italic underline">
+                            <span>Due:</span> <span>₹{student.due_fees}</span>
+                        </div>
+                    ) : Number(student.due_fees) < 0 ? (
+                        <div className="flex justify-between text-green-400 text-xl font-black italic underline">
+                            <span>Advance:</span> <span>₹{Math.abs(student.due_fees)}</span>
+                        </div>
+                    ) : (
+                         <div className="flex justify-between text-green-400 text-lg font-black italic">
+                            <span>Status:</span> <span>✅ Cleared</span>
+                        </div>
+                    )}
                   </div>
                 )}
+
              </div>
           </div>
         </div>
 
+        {/* Dynamic Ledger Table */}
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
           <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-800'} p-5 text-white font-black uppercase tracking-widest text-center text-sm`}>
              {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 MONTHLY FEES PAYMENT LEDGER'}
@@ -128,7 +161,6 @@ function StudentProfile() {
                   <td className="p-5 font-black text-green-600 text-lg italic">₹{item.price || item.amount}</td>
                   <td className="p-5 text-left font-black text-indigo-900 uppercase text-[10px] tracking-tighter">
                     <div className="text-xs text-slate-500">{item.plan_name || item.description || 'Verified Payment'}</div>
-                    {/* 🚀 NAYA JAADOO: Yahan Month print hoga! */}
                     {item.month && (
                       <div className="mt-1 bg-green-100 text-green-700 px-2 py-1 inline-block rounded border border-green-200 shadow-sm text-[9px] tracking-widest">
                         🗓️ FOR: {item.month}
