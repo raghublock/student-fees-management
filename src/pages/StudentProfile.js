@@ -1,215 +1,308 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import config from '../config'; 
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { sign, verify } from 'hono/jwt'
 
-function StudentProfile() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [student, setStudent] = useState(null);
-  const [paymentHistory, setPaymentHistory] = useState([]);
-  
-  const API_URL = config.apiUrl; 
-  const token = localStorage.getItem('adminToken');
-
-  useEffect(() => {
-    if (!token) return navigate('/');
-    
-    fetch(`${API_URL}/api/students`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (Array.isArray(data)) {
-        const foundStudent = data.find(s => Number(s.id) === Number(id));
-        setStudent(foundStudent);
-
-        if (foundStudent) {
-          const targetEndpoint = foundStudent.has_active_plan 
-            ? `${API_URL}/api/plans/history` 
-            : `${API_URL}/api/fees/history`;
-
-          fetch(targetEndpoint, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-          .then(res => res.json())
-          .then(historyData => {
-            if (Array.isArray(historyData)) {
-              const filtered = historyData.filter(item => Number(item.student_id) === Number(id));
-              setPaymentHistory(filtered);
-            }
-          })
-          .catch(() => toast.error("History load nahi hui"));
-        }
-      }
-    })
-    .catch(() => toast.error("Profile load nahi hui"));
-  }, [id, token, navigate]);
-
-  const handlePrint = () => { window.print(); };
-
-  if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
-
-  // 🚀 NAYA JAADOO: Expiry Date Calculate Karne Ka Smart Formula
-  let expiryDisplay = 'N/A';
-  if (paymentHistory.length > 0) {
-      const latestPayment = paymentHistory[0]; // Sabse latest payment
-      
-      if (student.has_active_plan) {
-          // PRO Plan walon ki direct Expiry Date DB se aayegi
-          expiryDisplay = latestPayment.expiry_date 
-            ? new Date(latestPayment.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
-            : 'N/A';
-      } else {
-          // Monthly walon ke liye latest paid month ka End nikalenge
-          if (latestPayment.month) {
-              const monthsArr = latestPayment.month.split(',').map(m => m.trim());
-              const lastMonth = monthsArr[monthsArr.length - 1]; // Jaise: "Apr 2026"
-              expiryDisplay = `End of ${lastMonth}`;
-          } else if (latestPayment.paid_on) {
-              // Backup plan: Agar month nahi hai toh paid_on date mein 30 din jod do
-              const d = new Date(latestPayment.paid_on);
-              d.setDate(d.getDate() + 30);
-              expiryDisplay = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-          }
-      }
-  }
-
-  return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans">
-      
-      {/* Navigation Header */}
-      <div className="max-w-5xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600 no-print">
-        <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} {config.mainEmoji}</h1>
-        <div className="flex gap-3">
-          <button onClick={handlePrint} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-black shadow-md hover:bg-indigo-700 transition active:scale-95">🖨️ Print Receipt</button>
-          <Link to="/dashboard" className="bg-slate-200 text-slate-700 px-5 py-2 rounded-lg font-black hover:bg-slate-300">← Back</Link>
-        </div>
-      </div>
-
-      <div id="printable-area" className="max-w-5xl mx-auto">
-        
-        {/* Profile Card Section */}
-        <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
-          <img 
-            src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} 
-            alt={config.userType} 
-            className="h-44 w-44 rounded-3xl object-cover border-4 border-indigo-50 shadow-lg"
-          />
-          
-          <div className="flex-1 text-center md:text-left space-y-2">
-            <div className="flex flex-col md:flex-row items-center gap-3 justify-center md:justify-start">
-              <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">{student.name}</h2>
-              {student.has_active_plan && (
-                <span className="bg-gradient-to-r from-yellow-400 to-orange-600 text-white text-[10px] px-4 py-1.5 rounded-full font-black animate-pulse shadow-xl border border-yellow-200 uppercase">
-                  PRO {config.userType.toUpperCase()} 📦
-                </span>
-              )}
-            </div>
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">
-              Account Status: {student.has_active_plan ? `Custom ${config.planLabel} Activated` : 'Regular Monthly Fees'}
-            </p>
-            <div className="pt-4 text-sm font-bold text-slate-600 grid grid-cols-1 md:grid-cols-2 gap-2 uppercase">
-                <p>📞 {student.mobile || 'N/A'}</p>
-                <p>🆔 {config.userType} ID: #{config.receiptPrefix}-{student.id}</p>
-            </div>
-
-            {/* Direct WhatsApp Button */}
-            <div className="pt-5 no-print">
-               <a 
-                 href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(Number(student.due_fees) > 0 ? `Namaste ${student.name}, Aapki ${config.appName} ki ₹${student.due_fees} fees due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka ${config.appName} ka account ekdum clear hai. Thank you!`)}`} 
-                 target="_blank" rel="noreferrer"
-                 className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2.5 rounded-xl font-black shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all uppercase tracking-widest text-xs"
-               >
-                 💬 Send WhatsApp Message
-               </a>
-            </div>
-          </div>
-
-          {/* Dynamic Summary Box */}
-          <div className={`w-full md:w-72 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
-             <h3 className="text-xs font-black mb-4 border-b border-white/20 pb-2 uppercase tracking-widest italic">
-                {student.has_active_plan ? 'Current Subscription' : 'Account Financials'}
-             </h3>
-             <div className="space-y-3 text-sm font-bold">
-                <div className="flex justify-between opacity-80">
-                  <span>Total Fees:</span> 
-                  <span>₹{student.has_active_plan ? paymentHistory[0]?.price || '...' : student.total_fees}</span>
-                </div>
-                <div className="flex justify-between text-indigo-300">
-                  <span>Paid:</span> 
-                  <span>₹{student.has_active_plan ? paymentHistory[0]?.price || '...' : student.paid_fees}</span>
-                </div>
-                
-                {/* Smart Due / Advance Checker */}
-                {!student.has_active_plan && (
-                  <div className="pt-2 mt-2 border-t border-white/20">
-                    {Number(student.due_fees) > 0 ? (
-                        <div className="flex justify-between text-red-400 text-xl font-black italic underline">
-                            <span>Due:</span> <span>₹{student.due_fees}</span>
-                        </div>
-                    ) : Number(student.due_fees) < 0 ? (
-                        <div className="flex justify-between text-green-400 text-xl font-black italic underline">
-                            <span>Advance:</span> <span>₹{Math.abs(student.due_fees)}</span>
-                        </div>
-                    ) : (
-                         <div className="flex justify-between text-green-400 text-lg font-black italic">
-                            <span>Status:</span> <span>✅ Cleared</span>
-                        </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 🚀 EXPIRY DATE ROW */}
-                <div className="pt-2 mt-2 border-t border-white/20">
-                    <div className="flex justify-between text-yellow-300 text-sm font-black uppercase tracking-wider">
-                        <span>Valid Till:</span> 
-                        <span>{expiryDisplay}</span>
-                    </div>
-                </div>
-
-             </div>
-          </div>
-        </div>
-
-        {/* Dynamic Ledger Table */}
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
-          <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-800'} p-5 text-white font-black uppercase tracking-widest text-center text-sm`}>
-             {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 MONTHLY FEES PAYMENT LEDGER'}
-          </div>
-          <table className="w-full text-center border-collapse">
-            <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-              <tr>
-                <th className="p-5 border-b">Transaction Date</th>
-                <th className="p-5 border-b">Amount</th>
-                <th className="p-5 border-b text-left">Details & Month</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paymentHistory.length > 0 ? paymentHistory.map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                  <td className="p-5 font-bold text-slate-500 uppercase text-xs">
-                    {item.start_date || (item.paid_on ? new Date(item.paid_on).toLocaleDateString('en-IN') : 'N/A')}
-                  </td>
-                  <td className="p-5 font-black text-green-600 text-lg italic">₹{item.price || item.amount}</td>
-                  <td className="p-5 text-left font-black text-indigo-900 uppercase text-[10px] tracking-tighter">
-                    <div className="text-xs text-slate-500">{item.plan_name || item.description || 'Verified Payment'}</div>
-                    {item.month && (
-                      <div className="mt-1 bg-green-100 text-green-700 px-2 py-1 inline-block rounded border border-green-200 shadow-sm text-[9px] tracking-widest">
-                        🗓️ FOR: {item.month}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              )) : (
-                <tr><td colSpan="3" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No payment history found.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+type Bindings = {
+  DB: D1Database;
+  SECRET_KEY: string;
 }
 
-export default StudentProfile;
+const app = new Hono<{ Bindings: Bindings }>()
+
+const SECRET = "bikaner-super-secret-2026";
+
+app.use('/api/*', cors({
+  origin: '*', 
+  allowHeaders: ['Content-Type', 'Authorization', 'Accept'], 
+  allowMethods: ['POST', 'GET', 'OPTIONS', 'PUT', 'DELETE'],
+}))
+
+// ==========================================
+// 1. AUTH ROUTES
+// ==========================================
+app.post('/api/register-admin', async (c) => {
+  const { name, email, password } = await c.req.json()
+  try {
+    await c.env.DB.prepare("INSERT INTO admins (name, email, password) VALUES (?, ?, ?)").bind(name, email, password).run()
+    return c.json({ message: "Admin registered successfully" }, 201)
+  } catch (error) {
+    return c.json({ error: "Email already exists" }, 400)
+  }
+})
+
+app.post('/api/login', async (c) => {
+  const { email, password } = await c.req.json()
+  const admin: any = await c.env.DB.prepare("SELECT * FROM admins WHERE email = ? AND password = ?").bind(email, password).first()
+
+  if (!admin) return c.json({ error: "Galat Email ya Password" }, 401)
+
+  const payload = { id: admin.id, email: admin.email, exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) }
+  const token = await sign(payload, SECRET)
+  
+  return c.json({ success: true, token, admin: { name: admin.name, email: admin.email } })
+})
+
+// ==========================================
+// 2. JWT MIDDLEWARE
+// ==========================================
+app.use('/api/*', async (c, next) => {
+  const path = c.req.path;
+  if (path === '/api/login' || path === '/api/register-admin') return next();
+  if (c.req.method === 'OPTIONS') return next(); 
+
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: "Token nahi mila" }, 401);
+
+  const token = authHeader.replace('Bearer ', '').trim();
+  try {
+    await verify(token, SECRET, "HS256");
+    await next();
+  } catch (err: any) {
+    return c.json({ error: `Token Error: ${err.message}` }, 401);
+  }
+})
+
+// ==========================================
+// 3. STUDENTS ROUTES (With PRO Status Check & Smart Delete 🗑️)
+// ==========================================
+app.get('/api/students', async (c) => {
+  const { results } = await c.env.DB.prepare(`
+    SELECT s.*, 
+    (SELECT COUNT(*) FROM student_plans WHERE student_id = s.id) > 0 as has_active_plan
+    FROM students s 
+    ORDER BY s.id DESC
+  `).all()
+  return c.json(results)
+})
+
+app.post('/api/student/add', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { name, total_fees, paid_fees, due_fees, extra_fees, mobile, whatsapp, email, photo } = body;
+    const safeEmail = email ? email : `dummy-${Date.now()}@bikaner.com`;
+    
+    await c.env.DB.prepare(
+      `INSERT INTO students (name, total_fees, paid_fees, due_fees, extra_fees, mobile, whatsapp, email, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(name, total_fees, paid_fees, due_fees, extra_fees, mobile, whatsapp, safeEmail, photo).run();
+    
+    return c.json({ success: true, message: "Student added" }, 201);
+  } catch (error: any) {
+    return c.json({ error: `DB Error: ${error.message}` }, 500);
+  }
+})
+
+app.put('/api/student/update/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const body = await c.req.json();
+    const { name, total_fees, paid_fees, due_fees, extra_fees, mobile, whatsapp, email, photo } = body;
+    const safeEmail = email ? email : `dummy-${id}@bikaner.com`;
+
+    await c.env.DB.prepare(`UPDATE students SET name=?, total_fees=?, paid_fees=?, due_fees=?, extra_fees=?, mobile=?, whatsapp=?, email=?, photo=? WHERE id=?`).bind(name, total_fees, paid_fees, due_fees, extra_fees, mobile, whatsapp, safeEmail, photo, id).run()
+    return c.json({ success: true, message: "Student updated" })
+  } catch (error: any) {
+    return c.json({ error: `DB Error: ${error.message}` }, 500);
+  }
+})
+
+// 🚀 NAYA MASTER DELETE ROUTE (History mitane aur crash rokne ke liye)
+app.delete('/api/student/delete/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+
+    // 1. Photo link nikaalo
+    const student: any = await c.env.DB.prepare("SELECT photo FROM students WHERE id=?").bind(id).first();
+
+    // 2. Agar photo Cloudinary par hai, toh usko cloud se udao
+    if (student && student.photo && student.photo.includes('cloudinary.com')) {
+      try {
+          const photoUrl = student.photo;
+          const urlParts = photoUrl.split('/upload/');
+          
+          if (urlParts.length === 2) {
+            let path = urlParts[1];
+            path = path.replace(/^v\d+\//, ''); 
+            const publicId = path.substring(0, path.lastIndexOf('.')); 
+
+            const CLOUD_NAME = "doaodzwor";
+            const API_KEY = "635621981192985"; 
+            const API_SECRET = "_wlqQI9YgXOcyMo01DxjksMXLx4"; 
+            
+            const authHeader = 'Basic ' + btoa(`${API_KEY}:${API_SECRET}`);
+
+            // Cloudinary Admin API ko delete command bhejna
+            await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image/upload`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': authHeader,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ public_ids: [publicId] })
+            });
+          }
+      } catch (e) {
+          // Galti se bhi agar Cloudinary na chale, toh database ka delete nahi rukna chahiye!
+          console.log("Photo udane mein error, lekin DB se delete continue rahega.");
+      }
+    }
+
+    // 3. 🚨 ASLI FIX: Pehle bacche ki FEES aur PLAN HISTORY ko udao, tabhi wo khud ud payega
+    await c.env.DB.prepare("DELETE FROM fees WHERE student_id=?").bind(id).run();
+    await c.env.DB.prepare("DELETE FROM student_plans WHERE student_id=?").bind(id).run();
+
+    // 4. Aakhir mein us bacche ka naam/record udao
+    await c.env.DB.prepare("DELETE FROM students WHERE id=?").bind(id).run();
+    
+    return c.json({ success: true, message: "Student, History aur Photo deleted safely!" });
+  } catch (error: any) {
+    return c.json({ error: `Delete fail ho gaya: ${error.message}` }, 500);
+  }
+})
+
+// ==========================================
+// 4. CUSTOM PLANS ROUTES (With Delete 🗑️)
+// ==========================================
+app.post('/api/plans/purchase', async (c) => {
+  const body = await c.req.json();
+  const { student_id, plan_name, duration_months, price, start_date } = body;
+
+  const start = new Date(start_date);
+  const expiry = new Date(start.setMonth(start.getMonth() + parseInt(duration_months)));
+  const expiry_date = expiry.toISOString().split('T')[0];
+
+  try {
+    await c.env.DB.prepare(
+      "INSERT INTO student_plans (student_id, plan_name, duration_months, price, start_date, expiry_date) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(student_id, plan_name, duration_months, price, start_date, expiry_date).run();
+    
+    return c.json({ success: true, message: "Plan activated!" });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get('/api/plans/history', async (c) => {
+  const { results } = await c.env.DB.prepare(`
+    SELECT sp.*, s.name as student_name 
+    FROM student_plans sp 
+    JOIN students s ON sp.student_id = s.id 
+    ORDER BY sp.id DESC
+  `).all();
+  return c.json(results);
+});
+
+app.delete('/api/plans/delete/:id', async (c) => {
+  const id = c.req.param('id');
+  try {
+    await c.env.DB.prepare("DELETE FROM student_plans WHERE id = ?").bind(id).run();
+    return c.json({ success: true, message: "Plan deleted successfully" });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ==========================================
+// 5. FEES ROUTES
+// ==========================================
+app.post('/api/fees/add', async (c) => {
+  const { student_id, amount, paid_on, mode, description, status, month } = await c.req.json()
+  await c.env.DB.prepare(
+    "INSERT INTO fees (student_id, amount, paid_on, mode, description, status, month) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).bind(student_id, amount, paid_on, mode, description, status || 'Paid', month || 'General').run()
+  return c.json({ success: true, message: "Fees record added" }, 201)
+})
+
+app.put('/api/fees/update/:id', async (c) => {
+  const id = c.req.param('id')
+  const { amount, paid_on, mode, description, status, month } = await c.req.json()
+  await c.env.DB.prepare(
+    "UPDATE fees SET amount=?, paid_on=?, mode=?, description=?, status=?, month=? WHERE id=?"
+  ).bind(amount, paid_on, mode, description, status, month, id).run()
+  return c.json({ success: true, message: "Fees updated" })
+})
+
+app.delete('/api/fees/delete/:id', async (c) => {
+  const id = c.req.param('id')
+  await c.env.DB.prepare("DELETE FROM fees WHERE id=?").bind(id).run()
+  return c.json({ success: true, message: "Fees record deleted" })
+})
+
+app.get('/api/fees/history', async (c) => {
+  const { results } = await c.env.DB.prepare(`
+    SELECT fees.*, students.name as student_name 
+    FROM fees JOIN students ON fees.student_id = students.id 
+    ORDER BY fees.paid_on DESC
+  `).all()
+  return c.json(results)
+})
+
+// ==========================================
+// 6. 📊 ANALYTICS & REPORTS ROUTES
+// ==========================================
+
+// A. Default This Month Stats
+app.get('/api/analytics/revenue', async (c) => {
+  try {
+    const revenue = await c.env.DB.prepare(`
+      SELECT 
+        (SELECT COALESCE(SUM(amount), 0) FROM fees WHERE strftime('%m', paid_on) = strftime('%m', 'now') AND strftime('%Y', paid_on) = strftime('%Y', 'now')) as regular_monthly,
+        (SELECT COALESCE(SUM(price), 0) FROM student_plans WHERE strftime('%m', start_date) = strftime('%m', 'now') AND strftime('%Y', start_date) = strftime('%Y', 'now')) as pro_monthly
+    `).first();
+
+    const stats = await c.env.DB.prepare(`
+      SELECT 
+        (SELECT COUNT(*) FROM (SELECT student_id, MIN(min_date) as first_date FROM (SELECT student_id, MIN(paid_on) as min_date FROM fees GROUP BY student_id UNION SELECT student_id, MIN(start_date) as min_date FROM student_plans GROUP BY student_id) GROUP BY student_id) WHERE strftime('%m', first_date) = strftime('%m', 'now') AND strftime('%Y', first_date) = strftime('%Y', 'now')) as new_joining,
+        (SELECT COUNT(*) FROM students s WHERE NOT EXISTS (SELECT 1 FROM fees WHERE student_id = s.id AND paid_on >= date('now', '-30 days')) AND NOT EXISTS (SELECT 1 FROM student_plans WHERE student_id = s.id AND expiry_date >= date('now'))) as exits
+    `).first();
+
+    return c.json({ revenue, stats });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// B. 📅 Custom Date Range API
+app.post('/api/analytics/custom', async (c) => {
+  const { startDate, endDate } = await c.req.json();
+  try {
+    const revenueResult = await c.env.DB.prepare(`
+      SELECT 
+        (SELECT COALESCE(SUM(amount), 0) FROM fees WHERE paid_on >= ? AND paid_on <= ?) as custom_regular,
+        (SELECT COALESCE(SUM(price), 0) FROM student_plans WHERE start_date >= ? AND start_date <= ?) as custom_pro
+    `).bind(startDate, endDate, startDate, endDate).first();
+
+    const joinResult = await c.env.DB.prepare(`
+      SELECT COUNT(*) as custom_joined FROM (
+        SELECT student_id, MIN(min_date) as first_date FROM (
+          SELECT student_id, MIN(paid_on) as min_date FROM fees GROUP BY student_id
+          UNION
+          SELECT student_id, MIN(start_date) as min_date FROM student_plans GROUP BY student_id
+        ) GROUP BY student_id
+      ) WHERE first_date >= ? AND first_date <= ?
+    `).bind(startDate, endDate).first();
+
+    return c.json({ 
+      customRegular: revenueResult.custom_regular, 
+      customPro: revenueResult.custom_pro,
+      customJoined: joinResult.custom_joined 
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// C. Bulk WhatsApp API
+app.get('/api/analytics/pending-reminders', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT id, name, whatsapp, due_fees 
+      FROM students 
+      WHERE due_fees > 0
+    `).all();
+    return c.json(results);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+export default app
