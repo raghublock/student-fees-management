@@ -31,9 +31,9 @@ function Dashboard() {
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [dueMonthName, setDueMonthName] = useState(''); 
 
-  // 🚀 NAYA STATE: Auto-Bill Popup ke liye
   const [showBillModal, setShowBillModal] = useState(false);
   const [billAmount, setBillAmount] = useState('');
+  const [billMonthTarget, setBillMonthTarget] = useState(currentMonthName);
 
   const navigate = useNavigate();
   const API_URL = config.apiUrl;
@@ -154,21 +154,20 @@ function Dashboard() {
             
             if(newStudent) {
                 studentIdForPlan = newStudent.id;
-                if (paid > 0) {
-                    await fetch(`${API_URL}/api/fees/add`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({
-                            student_id: newStudent.id,
-                            amount: paid,
-                            paid_on: new Date().toISOString().split('T')[0],
-                            mode: 'Cash',
-                            description: isProPlan ? `PRO Plan: ${planName}` : 'Initial Registration Fees',
-                            status: 'Paid',
-                            month: formMonth 
-                        })
-                    });
-                }
+                // 🚀 FIX: Ab chahe paise de ya na de (paid 0 ho), Initial Registration History zaroor banegi!
+                await fetch(`${API_URL}/api/fees/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        student_id: newStudent.id,
+                        amount: paid,
+                        paid_on: new Date().toISOString().split('T')[0],
+                        mode: paid > 0 ? 'Cash' : 'System',
+                        description: isProPlan ? `PRO Plan: ${planName}` : 'Initial Registration Fees',
+                        status: paid > 0 ? 'Paid' : 'Billed',
+                        month: formMonth 
+                    })
+                });
             }
         }
 
@@ -287,26 +286,25 @@ function Dashboard() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 🚀 NAYA JAADOO: Auto-Generate Bills Function
   const handleGenerateBills = async (e) => {
     e.preventDefault();
     const amt = Number(billAmount);
     if(amt <= 0) return toast.error("Fees amount dalein!");
 
-    const tid = toast.loading("Naye mahine ke bills ban rahe hain...");
+    const tid = toast.loading("Smart Bill Generate ho raha hai...");
     try {
         const res = await fetch(`${API_URL}/api/fees/generate-monthly`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ amount: amt })
+            body: JSON.stringify({ amount: amt, targetMonth: billMonthTarget })
         });
         const data = await res.json();
 
         if (res.ok) {
-            toast.success(data.message || "Bills Generate ho gaye! ✅", { id: tid });
+            toast.success(data.message, { id: tid });
             setShowBillModal(false);
             setBillAmount('');
-            fetchStudents(); // Table naye dues ke sath refresh ho jayegi
+            fetchStudents(); 
         } else {
             toast.error(data.error || "Error aayi.", { id: tid });
         }
@@ -337,7 +335,6 @@ function Dashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           
-          {/* 🚀 AUTO-BILL BUTTON */}
           <button onClick={() => setShowBillModal(true)} className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-black border border-indigo-200 hover:bg-indigo-200 transition text-sm shadow-sm flex items-center gap-1">
              🗓️ Auto-Bill (Month)
           </button>
@@ -643,15 +640,27 @@ function Dashboard() {
         </div>
       )}
 
-      {/* 🚀 AUTO-BILL MODAL */}
+      {/* 🚀 SMART AUTO-BILL MODAL */}
       {showBillModal && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all border-t-8 border-indigo-500">
              <h3 className="text-xl font-black uppercase text-center mb-1 text-indigo-700">🗓️ Generate New Month Bills</h3>
-             <p className="text-center text-[10px] font-bold text-slate-400 mb-6 uppercase tracking-widest">
-                This adds due amount to ALL Regular Students.
+             <p className="text-center text-[10px] font-bold text-slate-400 mb-4 uppercase tracking-widest">
+                Skipping students who already paid for this month.
              </p>
              <form onSubmit={handleGenerateBills} className="space-y-4">
+                
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Billing Month</label>
+                    <select 
+                        className="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700 mt-1 mb-2" 
+                        value={billMonthTarget} 
+                        onChange={(e) => setBillMonthTarget(e.target.value)}
+                    >
+                        {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+
                 <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Base Fee (₹)</label>
                     <input 
@@ -663,6 +672,7 @@ function Dashboard() {
                         required autoFocus
                     />
                 </div>
+
                 <div className="flex gap-2 pt-2">
                     <button type="button" onClick={() => setShowBillModal(false)} className="flex-1 bg-slate-100 text-slate-500 font-black py-3 rounded-xl hover:bg-slate-200 transition">Cancel</button>
                     <button type="submit" className="flex-1 text-white font-black py-3 rounded-xl shadow-lg transition uppercase tracking-widest bg-indigo-600 hover:bg-indigo-700">
