@@ -50,7 +50,6 @@ function StudentProfile() {
 
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
-  // Expiry Date Logic
   let expiryDisplay = 'N/A';
   let latestPayment = null;
   
@@ -77,12 +76,8 @@ function StudentProfile() {
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
       
-      {/* ========================================================= */}
-      {/* 🖥️ SCREEN VIEW (Print karte waqt ye sab GAYAB ho jayega)  */}
-      {/* ========================================================= */}
       <div className="print:hidden">
         
-        {/* Navigation Header */}
         <div className="max-w-5xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
             <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} {config.mainEmoji}</h1>
             <div className="flex gap-3">
@@ -92,7 +87,6 @@ function StudentProfile() {
         </div>
 
         <div className="max-w-5xl mx-auto">
-            {/* Profile Card Section */}
             <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
             <img 
                 src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} 
@@ -128,7 +122,6 @@ function StudentProfile() {
                 </div>
             </div>
 
-            {/* Dynamic Summary Box */}
             <div className={`w-full md:w-72 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
                 <h3 className="text-xs font-black mb-4 border-b border-white/20 pb-2 uppercase tracking-widest italic">
                     {student.has_active_plan ? 'Current Subscription' : 'Account Financials'}
@@ -172,37 +165,54 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* Ledger Table */}
+            {/* 📒 NAYA JAADOO: Ledger Table (Passbook View) */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-800'} p-5 text-white font-black uppercase tracking-widest text-center text-sm`}>
-                {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 MONTHLY FEES PAYMENT LEDGER'}
+                {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 MONTHLY FEES PASSBOOK'}
             </div>
             <table className="w-full text-center border-collapse">
                 <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
                 <tr>
-                    <th className="p-5 border-b">Transaction Date</th>
-                    <th className="p-5 border-b">Amount</th>
-                    <th className="p-5 border-b text-left">Details & Month</th>
+                    <th className="p-5 border-b text-left">Date</th>
+                    <th className="p-5 border-b">Details & Month</th>
+                    <th className="p-5 border-b text-right">Ledger Amount</th>
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                 {paymentHistory.length > 0 ? paymentHistory.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                    <td className="p-5 font-bold text-slate-500 uppercase text-xs">
+                    
+                    <td className="p-5 font-bold text-slate-500 uppercase text-xs text-left">
                         {item.start_date || (item.paid_on ? new Date(item.paid_on).toLocaleDateString('en-IN') : 'N/A')}
                     </td>
-                    <td className="p-5 font-black text-green-600 text-lg italic">₹{item.price || item.amount}</td>
-                    <td className="p-5 text-left font-black text-indigo-900 uppercase text-[10px] tracking-tighter">
+                    
+                    <td className="p-5 text-center font-black text-indigo-900 uppercase text-[10px] tracking-tighter">
                         <div className="text-xs text-slate-500">{item.plan_name || item.description || 'Verified Payment'}</div>
                         {item.month && (
-                        <div className="mt-1 bg-green-100 text-green-700 px-2 py-1 inline-block rounded border border-green-200 shadow-sm text-[9px] tracking-widest">
+                        <div className="mt-1 bg-slate-100 text-slate-700 px-2 py-1 inline-block rounded border border-slate-200 shadow-sm text-[9px] tracking-widest">
                             🗓️ FOR: {item.month}
                         </div>
                         )}
                     </td>
+
+                    {/* 🚀 NAYA LEDGER AMOUNT LOGIC (Red for Bill, Green for Paid) */}
+                    <td className="p-5 font-black text-lg italic text-right">
+                        {item.status === 'Billed' ? (
+                            <span className="text-red-500">
+                                ⚠️ +₹{item.amount || item.price} <br/>
+                                <span className="text-[9px] text-gray-400 uppercase tracking-widest">Added to Due</span>
+                            </span>
+                        ) : (
+                            <span className="text-green-600">
+                                ✅ ₹{item.amount || item.price} <br/>
+                                <span className="text-[9px] text-gray-400 uppercase tracking-widest">Amount Paid</span>
+                            </span>
+                        )}
+                    </td>
+
                     </tr>
                 )) : (
-                    <tr><td colSpan="3" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No payment history found.</td></tr>
+                    <tr><td colSpan="3" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No passbook history found.</td></tr>
                 )}
                 </tbody>
             </table>
@@ -210,13 +220,7 @@ function StudentProfile() {
         </div>
       </div>
 
-
-      {/* ========================================================= */}
-      {/* 🖨️ PRINT VIEW (Normal screen par GAYAB, Print pe Dikhai dega) */}
-      {/* ========================================================= */}
       <div className="hidden print:block w-full max-w-3xl mx-auto bg-white text-black p-8 border-2 border-gray-800 outline-2 outline-offset-4 outline-black">
-        
-        {/* Receipt Header */}
         <div className="flex justify-between items-end border-b-4 border-gray-800 pb-6 mb-6">
             <div>
                <h1 className="text-5xl font-black uppercase tracking-tighter text-black">{config.appName}</h1>
@@ -228,8 +232,6 @@ function StudentProfile() {
                <p className="font-bold text-gray-800 text-sm">Date: {new Date().toLocaleDateString('en-IN')}</p>
             </div>
         </div>
-
-        {/* Billed To */}
         <div className="mb-8 flex justify-between">
             <div>
                <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Billed To:</p>
@@ -245,8 +247,6 @@ function StudentProfile() {
                 </div>
             )}
         </div>
-
-        {/* Latest Payment Details Table */}
         <table className="w-full border-collapse border-2 border-gray-800 mb-8">
             <thead className="bg-gray-100">
                 <tr>
@@ -272,8 +272,6 @@ function StudentProfile() {
                 </tr>
             </tbody>
         </table>
-
-        {/* Due Balance Section */}
         {!student.has_active_plan && Number(student.due_fees) > 0 && (
             <div className="flex justify-end mb-8">
                <div className="border-2 border-gray-800 p-3 w-64 flex justify-between bg-gray-100">
@@ -282,8 +280,6 @@ function StudentProfile() {
                </div>
             </div>
         )}
-
-        {/* Footer & Signature */}
         <div className="mt-16 pt-8 border-t-2 border-dashed border-gray-400 flex justify-between items-end">
             <div>
                <p className="font-black text-xl italic text-gray-800">Thank You!</p>
@@ -294,9 +290,7 @@ function StudentProfile() {
                <p className="font-black uppercase tracking-widest text-xs text-gray-600">Authorized Signature</p>
             </div>
         </div>
-
       </div>
-
     </div>
   );
 }
