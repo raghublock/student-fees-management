@@ -50,6 +50,31 @@ function StudentProfile() {
 
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
+  // 🚀 NAYA JAADOO: Expiry Date Calculate Karne Ka Smart Formula
+  let expiryDisplay = 'N/A';
+  if (paymentHistory.length > 0) {
+      const latestPayment = paymentHistory[0]; // Sabse latest payment
+      
+      if (student.has_active_plan) {
+          // PRO Plan walon ki direct Expiry Date DB se aayegi
+          expiryDisplay = latestPayment.expiry_date 
+            ? new Date(latestPayment.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
+            : 'N/A';
+      } else {
+          // Monthly walon ke liye latest paid month ka End nikalenge
+          if (latestPayment.month) {
+              const monthsArr = latestPayment.month.split(',').map(m => m.trim());
+              const lastMonth = monthsArr[monthsArr.length - 1]; // Jaise: "Apr 2026"
+              expiryDisplay = `End of ${lastMonth}`;
+          } else if (latestPayment.paid_on) {
+              // Backup plan: Agar month nahi hai toh paid_on date mein 30 din jod do
+              const d = new Date(latestPayment.paid_on);
+              d.setDate(d.getDate() + 30);
+              expiryDisplay = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          }
+      }
+  }
+
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
       
@@ -89,7 +114,7 @@ function StudentProfile() {
                 <p>🆔 {config.userType} ID: #{config.receiptPrefix}-{student.id}</p>
             </div>
 
-            {/* 🚀 NAYA JAADOO: Direct WhatsApp Button */}
+            {/* Direct WhatsApp Button */}
             <div className="pt-5 no-print">
                <a 
                  href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(Number(student.due_fees) > 0 ? `Namaste ${student.name}, Aapki ${config.appName} ki ₹${student.due_fees} fees due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka ${config.appName} ka account ekdum clear hai. Thank you!`)}`} 
@@ -116,7 +141,7 @@ function StudentProfile() {
                   <span>₹{student.has_active_plan ? paymentHistory[0]?.price || '...' : student.paid_fees}</span>
                 </div>
                 
-                {/* 🚀 NAYA JAADOO: Smart Due / Advance Checker */}
+                {/* Smart Due / Advance Checker */}
                 {!student.has_active_plan && (
                   <div className="pt-2 mt-2 border-t border-white/20">
                     {Number(student.due_fees) > 0 ? (
@@ -134,6 +159,14 @@ function StudentProfile() {
                     )}
                   </div>
                 )}
+
+                {/* 🚀 EXPIRY DATE ROW */}
+                <div className="pt-2 mt-2 border-t border-white/20">
+                    <div className="flex justify-between text-yellow-300 text-sm font-black uppercase tracking-wider">
+                        <span>Valid Till:</span> 
+                        <span>{expiryDisplay}</span>
+                    </div>
+                </div>
 
              </div>
           </div>
