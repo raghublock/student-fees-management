@@ -31,6 +31,10 @@ function Dashboard() {
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [dueMonthName, setDueMonthName] = useState(''); 
 
+  // 🚀 NAYA STATE: Auto-Bill Popup ke liye
+  const [showBillModal, setShowBillModal] = useState(false);
+  const [billAmount, setBillAmount] = useState('');
+
   const navigate = useNavigate();
   const API_URL = config.apiUrl;
   const token = localStorage.getItem('adminToken');
@@ -251,7 +255,6 @@ function Dashboard() {
     }
   };
 
-  // 🚀 FIX: Improved Delete function with robust error handling
   const handleDelete = async (id) => {
     if(window.confirm("Kripya confirm karein. Student aur uski saari Fees/Plan History hamesha ke liye delete ho jayegi!")) {
       const tid = toast.loading("Database se delete ho raha hai... 🗑️");
@@ -284,6 +287,34 @@ function Dashboard() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // 🚀 NAYA JAADOO: Auto-Generate Bills Function
+  const handleGenerateBills = async (e) => {
+    e.preventDefault();
+    const amt = Number(billAmount);
+    if(amt <= 0) return toast.error("Fees amount dalein!");
+
+    const tid = toast.loading("Naye mahine ke bills ban rahe hain...");
+    try {
+        const res = await fetch(`${API_URL}/api/fees/generate-monthly`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ amount: amt })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            toast.success(data.message || "Bills Generate ho gaye! ✅", { id: tid });
+            setShowBillModal(false);
+            setBillAmount('');
+            fetchStudents(); // Table naye dues ke sath refresh ho jayegi
+        } else {
+            toast.error(data.error || "Error aayi.", { id: tid });
+        }
+    } catch (error) {
+        toast.error("Network Problem.", { id: tid });
+    }
+  };
+
   const filteredStudents = students.filter(s => {
     const searchLow = searchTerm.toLowerCase();
     const matchNameOrMobile = (s.name?.toLowerCase().includes(searchLow)) || (s.mobile?.includes(searchLow));
@@ -305,6 +336,12 @@ function Dashboard() {
           <p className="text-gray-500 font-bold text-sm uppercase tracking-widest">{config.branchName} | Admin: {adminName}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          
+          {/* 🚀 AUTO-BILL BUTTON */}
+          <button onClick={() => setShowBillModal(true)} className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-black border border-indigo-200 hover:bg-indigo-200 transition text-sm shadow-sm flex items-center gap-1">
+             🗓️ Auto-Bill (Month)
+          </button>
+          
           <Link to="/analytics" className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold hover:bg-black shadow-md transition text-sm">📊 Analytics</Link>
           <button onClick={() => { localStorage.clear(); navigate('/'); }} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold hover:bg-red-100 transition text-sm border border-red-200">Logout</button>
         </div>
@@ -602,6 +639,37 @@ function Dashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 AUTO-BILL MODAL */}
+      {showBillModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all border-t-8 border-indigo-500">
+             <h3 className="text-xl font-black uppercase text-center mb-1 text-indigo-700">🗓️ Generate New Month Bills</h3>
+             <p className="text-center text-[10px] font-bold text-slate-400 mb-6 uppercase tracking-widest">
+                This adds due amount to ALL Regular Students.
+             </p>
+             <form onSubmit={handleGenerateBills} className="space-y-4">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Base Fee (₹)</label>
+                    <input 
+                        type="number" 
+                        className="w-full border-2 border-slate-200 p-3 rounded-xl outline-none font-black text-xl focus:border-indigo-500 text-indigo-700 text-center" 
+                        value={billAmount} 
+                        onChange={(e) => setBillAmount(e.target.value)} 
+                        placeholder="e.g. 500"
+                        required autoFocus
+                    />
+                </div>
+                <div className="flex gap-2 pt-2">
+                    <button type="button" onClick={() => setShowBillModal(false)} className="flex-1 bg-slate-100 text-slate-500 font-black py-3 rounded-xl hover:bg-slate-200 transition">Cancel</button>
+                    <button type="submit" className="flex-1 text-white font-black py-3 rounded-xl shadow-lg transition uppercase tracking-widest bg-indigo-600 hover:bg-indigo-700">
+                        🚀 Auto-Bill
+                    </button>
+                </div>
+             </form>
           </div>
         </div>
       )}
