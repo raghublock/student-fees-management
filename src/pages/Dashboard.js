@@ -19,11 +19,10 @@ function Dashboard() {
   const currentMonthName = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
   const [formMonth, setFormMonth] = useState(currentMonthName);
 
-  // 📦 PRO PLAN STATE (Smart Toggle ke sath)
   const [isProPlan, setIsProPlan] = useState(false);
   const [planName, setPlanName] = useState('');
   const [planDuration, setPlanDuration] = useState('');
-  const [planPrice, setPlanPrice] = useState(''); // Naya State Plan Fees ke liye
+  const [planPrice, setPlanPrice] = useState(''); 
 
   const [quickPayStudent, setQuickPayStudent] = useState(null);
   const [paymentType, setPaymentType] = useState('ADVANCE'); 
@@ -37,10 +36,11 @@ function Dashboard() {
   const token = localStorage.getItem('adminToken');
   const adminName = localStorage.getItem('adminName');
 
+  // 📅 NAYA JAADOO: Poore 12 Mahino ka Calendar (Pichla 1 + Agle 11 Mahine)
   const getMonthOptions = () => {
     const options = [];
     const d = new Date();
-    for(let i = -2; i < 6; i++) {
+    for(let i = -1; i < 11; i++) {
       const nd = new Date(d.getFullYear(), d.getMonth() + i, 1);
       options.push(nd.toLocaleString('default', { month: 'short', year: 'numeric' }));
     }
@@ -123,12 +123,10 @@ function Dashboard() {
     };
   };
 
-  // 📝 Main Registration Logic (Smart Toggle ke sath)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isUploading) return toast.error("Pehle photo upload hone dein!");
 
-    // 🚀 NAYA JAADOO: Agar Plan active hai, toh fees wahan se aayegi
     const total = isProPlan ? Number(planPrice) : (Number(formData.total_fees) || 0);
     const paid = isProPlan ? Number(planPrice) : (Number(formData.paid_fees) || 0);
     const due = total - paid;
@@ -346,7 +344,6 @@ function Dashboard() {
             {isUploading && <span className="absolute right-2 text-xs font-bold text-indigo-600">Uploading...</span>}
           </div>
 
-          {/* 🚀 SMART TOGGLE: Agar Plan OFF hai tabhi ye 3 dabbe dikhenge */}
           {!isProPlan && (
             <>
               <div className="flex flex-col">
@@ -379,7 +376,6 @@ function Dashboard() {
              </label>
           </div>
 
-          {/* 🚀 PLAN DETAILS: Sirf Plan ON hone par dikhenge */}
           {isProPlan && (
              <div className="col-span-1 md:col-span-5 grid grid-cols-1 md:grid-cols-3 gap-3 bg-orange-50 p-4 rounded-xl border border-orange-200 mb-2 shadow-inner">
                  <div className="flex flex-col">
@@ -488,19 +484,27 @@ function Dashboard() {
                             </button>
                         )}
 
-                        <button 
-                            onClick={() => {
-                                setQuickPayStudent(s);
-                                setPaymentType('ADVANCE');
-                                setSelectedMonths([currentMonthName]); 
-                            }} 
-                            className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-black transition text-[10px] uppercase flex items-center shadow-md"
-                        >
-                            ⏩ Advance
-                        </button>
+                        {/* 🚀 NAYA JAADOO: Advance button sirf Normal students ko dikhega */}
+                        {!s.has_active_plan && (
+                            <button 
+                                onClick={() => {
+                                    setQuickPayStudent(s);
+                                    setPaymentType('ADVANCE');
+                                    setSelectedMonths([currentMonthName]); 
+                                }} 
+                                className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-black transition text-[10px] uppercase flex items-center shadow-md"
+                            >
+                                ⏩ Advance
+                            </button>
+                        )}
 
                         <Link to={`/student/${s.id}`} className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg font-black hover:bg-slate-200 transition text-[10px]">Profile</Link>
                         <button onClick={() => handleEdit(s)} className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-black hover:bg-amber-100 transition text-[10px]">✏️ Edit</button>
+                        
+                        {/* 🚀 DELETE BUTTON UPDATE: Saaf saaf Delete likh diya */}
+                        <button onClick={() => handleDelete(s.id)} className="bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-black hover:bg-red-100 transition text-[10px] flex items-center gap-1">
+                            🗑️ Delete
+                        </button>
                     </div>
                     </td>
                 </tr>
@@ -544,7 +548,7 @@ function Dashboard() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">
                     Select Paying Months
                   </label>
-                  <div className="flex flex-wrap gap-2 bg-slate-50 p-3 rounded-xl border-2 border-slate-100 max-h-32 overflow-y-auto">
+                  <div className="flex flex-wrap gap-2 bg-slate-50 p-3 rounded-xl border-2 border-slate-100 max-h-40 overflow-y-auto">
                     {monthOptions.map(month => (
                       <span 
                         key={month}
