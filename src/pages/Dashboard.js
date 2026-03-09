@@ -16,24 +16,21 @@ function Dashboard() {
   const [editingId, setEditingId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // 💰 Registration Form ke mahine ke liye state
   const currentMonthName = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
   const [formMonth, setFormMonth] = useState(currentMonthName);
 
-  // 💰 Quick Pay / Due Pay Modal ke states
   const [quickPayStudent, setQuickPayStudent] = useState(null);
-  const [paymentType, setPaymentType] = useState('ADVANCE'); // 'DUE' ya 'ADVANCE'
+  const [paymentType, setPaymentType] = useState('ADVANCE'); 
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState('Cash');
   const [selectedMonths, setSelectedMonths] = useState([]);
-  const [dueMonthName, setDueMonthName] = useState(''); // Due clear karne wale mahine ka naam
+  const [dueMonthName, setDueMonthName] = useState(''); 
 
   const navigate = useNavigate();
   const API_URL = config.apiUrl;
   const token = localStorage.getItem('adminToken');
   const adminName = localStorage.getItem('adminName');
 
-  // 📅 Mahino ki list (Pichle 2 se aage ke 5 mahine)
   const getMonthOptions = () => {
     const options = [];
     const d = new Date();
@@ -120,7 +117,6 @@ function Dashboard() {
     };
   };
 
-  // 📝 Main Registration Logic
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isUploading) return toast.error("Pehle photo upload hone dein!");
@@ -140,11 +136,9 @@ function Dashboard() {
       });
       
       if (response.ok) {
-        // 🚀 NAYA JAADOO: Agar naya student hai aur paise diye hain, toh History mein daalo!
         if (!editingId && paid > 0) {
             const res2 = await fetch(`${API_URL}/api/students`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data2 = await res2.json();
-            // Sabse naya (latest) record uthana
             const newStudent = data2.find(s => s.name === formData.name && s.mobile === formData.mobile);
             
             if(newStudent) {
@@ -158,7 +152,7 @@ function Dashboard() {
                         mode: 'Cash',
                         description: 'Initial Registration Fees',
                         status: 'Paid',
-                        month: formMonth // Jo mahina form mein chuna gaya hai
+                        month: formMonth 
                     })
                 });
             }
@@ -172,13 +166,12 @@ function Dashboard() {
     } catch (error) { toast.error("Network problem."); }
   };
 
-  // 💰 Quick Pay / Due Pay Logic
+  // 🚀 THE BIG FIX: Due vs Advance Calculation Math
   const handleQuickPay = async (e) => {
     e.preventDefault();
     const payAmt = Number(payAmount);
     if(payAmt <= 0) return toast.error("Sahi amount daalein!");
     
-    // Agar "DUE" pay kar raha hai toh amount Due se zyada nahi hona chahiye
     if(paymentType === 'DUE' && payAmt > quickPayStudent.due_fees) {
         return toast.error(`Aap ₹${quickPayStudent.due_fees} se zyada due pay nahi kar sakte!`);
     }
@@ -189,7 +182,7 @@ function Dashboard() {
     const tid = toast.loading("Fees jama ho rahi hai...");
     
     try {
-      // 1. Ledger mein entry
+      // 1. Ledger mein mahine ke sath entry
       await fetch(`${API_URL}/api/fees/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -204,18 +197,24 @@ function Dashboard() {
         })
       });
 
-      // 2. Main record update
+      // 2. PERFECT MATH FORMULA 🧮
+      let newTotal = Number(quickPayStudent.total_fees);
       const newPaid = Number(quickPayStudent.paid_fees) + payAmt;
       let newDue = Number(quickPayStudent.due_fees);
       
-      // Agar DUE pay kiya hai toh Due kam hoga. Agar Advance diya hai toh Due same rahega aur Total badhega ya manage hoga.
-      // Par simple rakhte hain: PayAmt hamesha due kam karega. Agar Due negative ho jaye matlab Advance hai (Par abhi current logic ke hisaab se hi chalte hain)
-      newDue = newDue - payAmt;
+      if (paymentType === 'DUE') {
+          // Due clear kar raha hai
+          newDue = newDue - payAmt;
+      } else {
+          // Advance de raha hai, iska matlab uski Total Planning badh rahi hai
+          newTotal = newTotal + payAmt; 
+          // Due same rahega (0 tha toh 0 rahega) kyunki (newTotal - newPaid) same equation maintain karega
+      }
 
       await fetch(`${API_URL}/api/student/update/${quickPayStudent.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ ...quickPayStudent, paid_fees: newPaid, due_fees: newDue })
+        body: JSON.stringify({ ...quickPayStudent, total_fees: newTotal, paid_fees: newPaid, due_fees: newDue })
       });
 
       toast.success(`₹${payAmt} for ${finalMonths} Jama ho gaye! 🎉`, { id: tid });
@@ -257,15 +256,15 @@ function Dashboard() {
     return matchNameOrMobile && matchPending;
   });
 
+  // 📊 Dashboard Summary calculation (Negative dues ko ignore karke)
   const totalActive = students.length;
-  const totalDuesPending = students.reduce((sum, s) => sum + Number(s.due_fees || 0), 0);
+  const totalDuesPending = students.reduce((sum, s) => sum + (Number(s.due_fees) > 0 ? Number(s.due_fees) : 0), 0);
   const totalRevenue = students.reduce((sum, s) => sum + Number(s.paid_fees || 0), 0);
   const currentDuePreview = (Number(formData.total_fees) || 0) - (Number(formData.paid_fees) || 0);
 
   return (
     <div className="p-4 bg-slate-100 min-h-screen font-sans relative">
       
-      {/* Header Section */}
       <div className="flex justify-between items-center max-w-7xl mx-auto mb-6 bg-white p-5 rounded-2xl shadow-sm border-b-4 border-indigo-600 flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-black text-indigo-900 tracking-tight">{config.appName} {config.mainEmoji}</h1>
@@ -278,7 +277,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 📊 3 JADOO DABBE */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-sm border-l-8 border-indigo-500 flex justify-between items-center">
           <div>
@@ -303,7 +301,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 📝 REGISTRATION FORM (With Starting Month) */}
       <div className={`max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-t-8 ${editingId ? 'border-amber-400 bg-amber-50' : 'border-indigo-600'}`}>
         <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">
@@ -335,7 +332,6 @@ function Dashboard() {
             <input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-green-700" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
           </div>
 
-          {/* 📅 Starting Month Selector for Registration */}
           <div className="flex flex-col md:col-span-1">
              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Fees Month (History)</label>
              <select className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700" value={formMonth} onChange={(e) => setFormMonth(e.target.value)}>
@@ -349,7 +345,6 @@ function Dashboard() {
         </form>
       </div>
 
-      {/* 🔍 Smart Search Bar */}
       <div className="max-w-7xl mx-auto flex flex-wrap gap-4 items-center justify-between mb-4 bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
         <input 
           type="text" 
@@ -363,7 +358,6 @@ function Dashboard() {
         </label>
       </div>
 
-      {/* 🚦 Data Table */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 mb-20">
         <div className="overflow-x-auto">
             <table className="w-full text-left whitespace-nowrap">
@@ -404,13 +398,12 @@ function Dashboard() {
                     <td className="p-4 text-right">
                     <div className="flex gap-1.5 justify-end">
                         
-                        {/* ⚠️ PAY DUE BUTTON (Sirf tab dikhega jab Due hogi) */}
                         {s.due_fees > 0 && (
                             <button 
                                 onClick={() => {
                                     setQuickPayStudent(s);
                                     setPaymentType('DUE');
-                                    setPayAmount(s.due_fees); // Default due amount bhar do
+                                    setPayAmount(s.due_fees); 
                                 }} 
                                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg font-black transition text-[10px] uppercase flex items-center shadow-md"
                             >
@@ -418,12 +411,11 @@ function Dashboard() {
                             </button>
                         )}
 
-                        {/* ⏩ ADVANCE / NEXT MONTH BUTTON */}
                         <button 
                             onClick={() => {
                                 setQuickPayStudent(s);
                                 setPaymentType('ADVANCE');
-                                setSelectedMonths([currentMonthName]); // Default current month
+                                setSelectedMonths([currentMonthName]); 
                             }} 
                             className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-black transition text-[10px] uppercase flex items-center shadow-md"
                         >
@@ -441,7 +433,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 💰 DUAL ACTION PAYMENT MODAL (Due + Advance) */}
       {quickPayStudent && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all border-t-8 ${paymentType === 'DUE' ? 'border-orange-500' : 'border-indigo-500'}`}>
@@ -459,9 +450,7 @@ function Dashboard() {
 
             <form onSubmit={handleQuickPay} className="space-y-4">
               
-              {/* 🗓️ KIS CHEEZ KE PAISE HAIN? */}
               {paymentType === 'DUE' ? (
-                // DUE KE LIYE (Manual Month Input)
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Due of Which Month? (e.g. Jan 2026)</label>
                   <input 
@@ -474,7 +463,6 @@ function Dashboard() {
                   />
                 </div>
               ) : (
-                // ADVANCE KE LIYE (Multi-Month Selector)
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">
                     Select Paying Months
