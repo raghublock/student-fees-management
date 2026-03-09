@@ -19,10 +19,11 @@ function Dashboard() {
   const currentMonthName = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
   const [formMonth, setFormMonth] = useState(currentMonthName);
 
-  // 📦 PRO PLAN STATE (Naya Jaadoo)
+  // 📦 PRO PLAN STATE (Smart Toggle ke sath)
   const [isProPlan, setIsProPlan] = useState(false);
-  const [planName, setPlanName] = useState('Quarterly Package');
-  const [planDuration, setPlanDuration] = useState(3);
+  const [planName, setPlanName] = useState('');
+  const [planDuration, setPlanDuration] = useState('');
+  const [planPrice, setPlanPrice] = useState(''); // Naya State Plan Fees ke liye
 
   const [quickPayStudent, setQuickPayStudent] = useState(null);
   const [paymentType, setPaymentType] = useState('ADVANCE'); 
@@ -122,13 +123,14 @@ function Dashboard() {
     };
   };
 
-  // 📝 Main Submission Logic (With PRO Plan Formula)
+  // 📝 Main Registration Logic (Smart Toggle ke sath)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isUploading) return toast.error("Pehle photo upload hone dein!");
 
-    const total = Number(formData.total_fees) || 0;
-    const paid = Number(formData.paid_fees) || 0;
+    // 🚀 NAYA JAADOO: Agar Plan active hai, toh fees wahan se aayegi
+    const total = isProPlan ? Number(planPrice) : (Number(formData.total_fees) || 0);
+    const paid = isProPlan ? Number(planPrice) : (Number(formData.paid_fees) || 0);
     const due = total - paid;
     
     try {
@@ -144,7 +146,6 @@ function Dashboard() {
       if (response.ok) {
         let studentIdForPlan = editingId;
 
-        // Agar naya student hai toh details aur ID nikalo
         if (!editingId) {
             const res2 = await fetch(`${API_URL}/api/students`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data2 = await res2.json();
@@ -161,7 +162,7 @@ function Dashboard() {
                             amount: paid,
                             paid_on: new Date().toISOString().split('T')[0],
                             mode: 'Cash',
-                            description: isProPlan ? `PRO Plan Initial Fees` : 'Initial Registration Fees',
+                            description: isProPlan ? `PRO Plan: ${planName}` : 'Initial Registration Fees',
                             status: 'Paid',
                             month: formMonth 
                         })
@@ -170,7 +171,6 @@ function Dashboard() {
             }
         }
 
-        // 🚀 NAYA JAADOO: Agar Plan Checkbox Ticked Hai, toh Backend ko Plan bhi bhej do
         if (isProPlan && studentIdForPlan) {
              await fetch(`${API_URL}/api/plans/purchase`, {
                 method: 'POST',
@@ -179,16 +179,18 @@ function Dashboard() {
                     student_id: studentIdForPlan,
                     plan_name: planName,
                     duration_months: planDuration,
-                    price: total, // Total fee ko hi Plan ki aukaat maan liya
+                    price: planPrice, 
                     start_date: new Date().toISOString().split('T')[0]
                 })
             });
         }
 
-        // Sab reset kar do
         setFormData({ name: '', total_fees: '', paid_fees: '', extra_fees: '', mobile: '', whatsapp: '', email: '', photo: '' });
         setEditingId(null); 
-        setIsProPlan(false); // Checkbox band kar do
+        setIsProPlan(false); 
+        setPlanName('');
+        setPlanDuration('');
+        setPlanPrice('');
         toast.success(editingId ? "Data Updated! ✏️" : `Saved & Activated! 📦✅`);
         fetchStudents(); 
       }
@@ -264,7 +266,7 @@ function Dashboard() {
 
   const handleEdit = (student) => {
     setEditingId(student.id);
-    setIsProPlan(false); // Edit karte waqt galti se plan na add ho jaye
+    setIsProPlan(false); 
     setFormData({
       name: student.name, total_fees: student.total_fees, paid_fees: student.paid_fees,
       extra_fees: student.extra_fees || '', mobile: student.mobile || '',
@@ -283,7 +285,7 @@ function Dashboard() {
   const totalActive = students.length;
   const totalDuesPending = students.reduce((sum, s) => sum + (Number(s.due_fees) > 0 ? Number(s.due_fees) : 0), 0);
   const totalRevenue = students.reduce((sum, s) => sum + Number(s.paid_fees || 0), 0);
-  const currentDuePreview = (Number(formData.total_fees) || 0) - (Number(formData.paid_fees) || 0);
+  const currentDuePreview = isProPlan ? 0 : ((Number(formData.total_fees) || 0) - (Number(formData.paid_fees) || 0));
 
   return (
     <div className="p-4 bg-slate-100 min-h-screen font-sans relative">
@@ -344,24 +346,28 @@ function Dashboard() {
             {isUploading && <span className="absolute right-2 text-xs font-bold text-indigo-600">Uploading...</span>}
           </div>
 
-          <div className="flex flex-col">
-            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Total Fees (₹)</label>
-            <input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required />
-          </div>
-          
-          <div className="flex flex-col">
-            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Paid Amount (₹)</label>
-            <input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-green-700" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required />
-          </div>
+          {/* 🚀 SMART TOGGLE: Agar Plan OFF hai tabhi ye 3 dabbe dikhenge */}
+          {!isProPlan && (
+            <>
+              <div className="flex flex-col">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Total Fees (₹)</label>
+                <input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required={!isProPlan} />
+              </div>
+              
+              <div className="flex flex-col">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Paid Amount (₹)</label>
+                <input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-green-700" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required={!isProPlan} />
+              </div>
 
-          <div className="flex flex-col md:col-span-1">
-             <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Fees Month (History)</label>
-             <select className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700" value={formMonth} onChange={(e) => setFormMonth(e.target.value)}>
-                {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
-             </select>
-          </div>
+              <div className="flex flex-col md:col-span-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Fees Month (History)</label>
+                <select className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700" value={formMonth} onChange={(e) => setFormMonth(e.target.value)}>
+                    {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            </>
+          )}
 
-          {/* 🚀 PRO PLAN CHECKBOX */}
           <div className="col-span-1 md:col-span-5 flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
              <input 
                 type="checkbox" id="proPlan" 
@@ -369,23 +375,37 @@ function Dashboard() {
                 className="w-5 h-5 accent-orange-500 cursor-pointer" 
              />
              <label htmlFor="proPlan" className="font-black text-orange-600 uppercase tracking-widest text-xs cursor-pointer">
-                📦 Activate Custom PRO Plan (Enroll in Plan Mode)
+                📦 Activate Custom PRO Plan (Hide Regular Fees)
              </label>
           </div>
 
-          {/* 🚀 PLAN DETAILS (Sirf tab dikhenge jab checkbox tick hoga) */}
+          {/* 🚀 PLAN DETAILS: Sirf Plan ON hone par dikhenge */}
           {isProPlan && (
-             <div className="col-span-1 md:col-span-5 grid grid-cols-2 gap-3 bg-orange-50 p-4 rounded-xl border border-orange-200 mb-2">
-                 <input 
-                    type="text" placeholder="Plan Name (e.g. 3-Months Special)" 
-                    className="border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none font-bold text-orange-800 placeholder-orange-300" 
-                    value={planName} onChange={(e) => setPlanName(e.target.value)} required={isProPlan} 
-                 />
-                 <input 
-                    type="number" placeholder="Duration (Months)" 
-                    className="border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none font-bold text-orange-800 placeholder-orange-300" 
-                    value={planDuration} onChange={(e) => setPlanDuration(e.target.value)} required={isProPlan} 
-                 />
+             <div className="col-span-1 md:col-span-5 grid grid-cols-1 md:grid-cols-3 gap-3 bg-orange-50 p-4 rounded-xl border border-orange-200 mb-2 shadow-inner">
+                 <div className="flex flex-col">
+                     <label className="text-[9px] font-black text-orange-500 uppercase ml-1">Plan Name</label>
+                     <input 
+                        type="text" placeholder="e.g. 3-Months Special" 
+                        className="border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none font-bold text-orange-800 placeholder-orange-300" 
+                        value={planName} onChange={(e) => setPlanName(e.target.value)} required={isProPlan} 
+                     />
+                 </div>
+                 <div className="flex flex-col">
+                     <label className="text-[9px] font-black text-orange-500 uppercase ml-1">Duration (Months)</label>
+                     <input 
+                        type="number" placeholder="e.g. 3" 
+                        className="border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none font-bold text-orange-800 placeholder-orange-300" 
+                        value={planDuration} onChange={(e) => setPlanDuration(e.target.value)} required={isProPlan} 
+                     />
+                 </div>
+                 <div className="flex flex-col">
+                     <label className="text-[9px] font-black text-orange-500 uppercase ml-1">Plan Fees (₹) - Fully Paid</label>
+                     <input 
+                        type="number" placeholder="e.g. 1500" 
+                        className="border-2 border-orange-400 p-3 rounded-xl focus:border-orange-600 outline-none font-black text-orange-700 bg-white" 
+                        value={planPrice} onChange={(e) => setPlanPrice(e.target.value)} required={isProPlan} 
+                     />
+                 </div>
              </div>
           )}
           
@@ -430,7 +450,6 @@ function Dashboard() {
                     <div>
                         <div className="font-black text-slate-800 text-sm uppercase flex items-center gap-2">
                            {s.name}
-                           {/* 🚀 TAG YAHAN BHI DIKHEGA */}
                            {s.has_active_plan && (
                              <span className="bg-gradient-to-r from-orange-400 to-orange-600 text-white text-[9px] px-2 py-0.5 rounded-md font-black shadow-sm uppercase tracking-widest border border-orange-200">
                                PRO 📦
