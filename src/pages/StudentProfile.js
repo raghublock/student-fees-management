@@ -35,7 +35,6 @@ function StudentProfile() {
           .then(res => res.json())
           .then(historyData => {
             if (Array.isArray(historyData)) {
-              // Sirf is student ka data nikalo
               const filtered = historyData.filter(item => Number(item.student_id) === Number(id));
               setPaymentHistory(filtered);
             }
@@ -74,6 +73,37 @@ function StudentProfile() {
       }
   }
 
+  // 📊 NAYA JAADOO: Month-Wise Breakdown Calculation
+  const monthlySummary = {};
+  if (!student?.has_active_plan && paymentHistory.length > 0) {
+      paymentHistory.forEach(record => {
+          if (!record.month) return;
+          const monthsArr = record.month.split(',').map(m => m.trim());
+          const amountPerMonth = Number(record.amount || record.price || 0) / monthsArr.length;
+
+          monthsArr.forEach(month => {
+              if (!monthlySummary[month]) {
+                  monthlySummary[month] = { monthName: month, fee: 0, paid: 0 };
+              }
+              
+              if (record.status === 'Billed') {
+                  monthlySummary[month].fee += amountPerMonth;
+              } else { // 'Paid'
+                  monthlySummary[month].paid += amountPerMonth;
+                  // Fix for Initial Registration (Pehle mahine ka bill generate nahi hota, toh usko adjust kar diya)
+                  if (record.description && record.description.includes('Initial')) {
+                      monthlySummary[month].fee += amountPerMonth;
+                  }
+              }
+          });
+      });
+  }
+
+  // Mahino ko latest ke hisaab se sort karna
+  const monthStatementArray = Object.values(monthlySummary).sort((a, b) => {
+      return new Date(b.monthName) - new Date(a.monthName);
+  });
+
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
       
@@ -89,7 +119,7 @@ function StudentProfile() {
         </div>
 
         <div className="max-w-5xl mx-auto">
-            {/* Profile Box */}
+            {/* Top Profile & Classic Financial Box */}
             <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
             <img 
                 src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} 
@@ -125,7 +155,7 @@ function StudentProfile() {
                 </div>
             </div>
 
-            {/* 🚀 CLASSIC FINANCIAL BOX (Reverted as requested) */}
+            {/* 🚀 CLASSIC FINANCIAL BOX (Negative Due Fixed) */}
             <div className={`w-full md:w-80 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
                 <h3 className="text-xs font-black mb-4 border-b border-white/20 pb-2 uppercase tracking-widest italic">
                     {student.has_active_plan ? 'Current Subscription' : 'Account Financials'}
@@ -149,7 +179,7 @@ function StudentProfile() {
                                 <span>Due:</span> <span>₹{student.due_fees}</span>
                             </div>
                         ) : Number(student.due_fees) < 0 ? (
-                            <div className="flex justify-between text-green-400 text-xl font-black italic underline">
+                            <div className="flex justify-between text-blue-400 text-xl font-black italic underline">
                                 <span>Advance:</span> <span>₹{Math.abs(student.due_fees)}</span>
                             </div>
                         ) : (
@@ -160,7 +190,6 @@ function StudentProfile() {
                     </div>
                     )}
 
-                    {/* Expiry Date */}
                     <div className="pt-2 mt-2 border-t border-white/20">
                         <div className="flex justify-between text-yellow-300 text-sm font-black uppercase tracking-wider">
                             <span>Valid Till:</span> 
@@ -172,24 +201,70 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* 📒 MONTHLY FEES PASSBOOK (All records, Newest First) */}
+            {/* 📊 NAYA TABLE: MONTH-WISE STATEMENT */}
+            {!student.has_active_plan && monthStatementArray.length > 0 && (
+            <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-8">
+                <div className="bg-indigo-600 p-4 text-white font-black uppercase tracking-widest text-center text-sm">
+                    📊 MONTH-WISE FEE STATEMENT
+                </div>
+                <table className="w-full text-center border-collapse">
+                    <thead className="bg-indigo-50 text-[10px] font-black uppercase text-indigo-500 tracking-widest">
+                    <tr>
+                        <th className="p-4 border-b text-left pl-6">Billing Month</th>
+                        <th className="p-4 border-b">Total Fee</th>
+                        <th className="p-4 border-b">Paid Amount</th>
+                        <th className="p-4 border-b text-right pr-6">Month Status</th>
+                    </tr>
+                    </thead>
+                    <tbody className="divide-y divide-indigo-50">
+                    {monthStatementArray.map((m, idx) => {
+                        const dueForMonth = m.fee - m.paid;
+                        return (
+                        <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
+                            <td className="p-4 font-black text-indigo-900 uppercase text-xs text-left pl-6">
+                                🗓️ {m.monthName}
+                            </td>
+                            <td className="p-4 font-bold text-slate-500 text-sm">
+                                ₹{m.fee}
+                            </td>
+                            <td className="p-4 font-black text-green-600 text-sm">
+                                ₹{m.paid}
+                            </td>
+                            <td className="p-4 font-black text-xs text-right pr-6">
+                                {dueForMonth > 0 ? (
+                                    <span className="text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 shadow-sm">⚠️ Due: ₹{dueForMonth}</span>
+                                ) : dueForMonth < 0 ? (
+                                    <span className="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm">⭐ Adv: ₹{Math.abs(dueForMonth)}</span>
+                                ) : (
+                                    <span className="text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 shadow-sm">✅ Cleared</span>
+                                )}
+                            </td>
+                        </tr>
+                        )
+                    })}
+                    </tbody>
+                </table>
+            </div>
+            )}
+
+            {/* 📜 TABLE 2: ALL TRANSACTIONS (PASSBOOK) */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
-            <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-800'} p-5 text-white font-black uppercase tracking-widest text-center text-sm`}>
-                {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 MONTHLY FEES PASSBOOK'}
+            <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-slate-800'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
+                {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 DETAILED PASSBOOK (LEDGER)'}
             </div>
             <table className="w-full text-center border-collapse">
                 <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
                 <tr>
-                    <th className="p-5 border-b text-left">Transaction Date</th>
-                    <th className="p-5 border-b">Details & Month</th>
-                    <th className="p-5 border-b text-right">Ledger Amount</th>
+                    <th className="p-4 border-b text-left pl-6">Transaction Date</th>
+                    <th className="p-4 border-b">Details & Month</th>
+                    <th className="p-4 border-b text-right pr-6">Ledger Amount</th>
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                 {paymentHistory.length > 0 ? paymentHistory.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
                     
-                    <td className="p-5 font-bold text-slate-500 uppercase text-xs text-left">
+                    <td className="p-5 font-bold text-slate-500 uppercase text-xs text-left pl-6">
                         {item.start_date || (item.paid_on ? new Date(item.paid_on).toLocaleDateString('en-IN') : 'N/A')}
                     </td>
                     
@@ -202,7 +277,7 @@ function StudentProfile() {
                         )}
                     </td>
 
-                    <td className="p-5 font-black text-lg italic text-right">
+                    <td className="p-5 font-black text-lg italic text-right pr-6">
                         {item.status === 'Billed' ? (
                             <span className="text-red-500">
                                 ⚠️ +₹{item.amount || item.price} <br/>
@@ -223,6 +298,7 @@ function StudentProfile() {
                 </tbody>
             </table>
             </div>
+
         </div>
       </div>
 
@@ -256,6 +332,8 @@ function StudentProfile() {
                 </div>
             )}
         </div>
+        
+        {/* Naya addition print ke andar bhi Month dikhane ke liye */}
         <table className="w-full border-collapse border-2 border-gray-800 mb-8">
             <thead className="bg-gray-100">
                 <tr>
@@ -281,6 +359,7 @@ function StudentProfile() {
                 </tr>
             </tbody>
         </table>
+
         {!student.has_active_plan && Number(student.due_fees) > 0 && (
             <div className="flex justify-end mb-8">
                <div className="border-2 border-gray-800 p-3 w-64 flex justify-between bg-gray-100">
