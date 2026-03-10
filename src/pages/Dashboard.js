@@ -16,7 +16,6 @@ function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false); 
 
-  // Mahino ki list ke liye naya logic
   const currentMonthName = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
   const [formMonth, setFormMonth] = useState(currentMonthName);
 
@@ -25,7 +24,6 @@ function Dashboard() {
   const [planDuration, setPlanDuration] = useState('');
   const [planPrice, setPlanPrice] = useState(''); 
 
-  // Month-wise Quick Pay State
   const [quickPayStudent, setQuickPayStudent] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState('Cash');
@@ -36,10 +34,9 @@ function Dashboard() {
   const token = localStorage.getItem('adminToken');
   const adminName = localStorage.getItem('adminName');
 
-  // Generate a list of months for selection
   const getMonthOptions = () => {
     const options = [];
-    const d = new Date(new Date().getFullYear(), 0, 1); // Start from Jan of current year
+    const d = new Date(new Date().getFullYear(), 0, 1); 
     for(let i = 0; i < 12; i++) {
       options.push(d.toLocaleString('default', { month: 'short', year: 'numeric' }));
       d.setMonth(d.getMonth() + 1);
@@ -129,8 +126,6 @@ function Dashboard() {
     if (isSubmitting) return; 
 
     setIsSubmitting(true);
-    
-    // Naya logic: Total fees ki jagah ab ye Base Monthly Fee ban chuka hai
     const baseMonthlyFee = isProPlan ? Number(planPrice) : (Number(formData.total_fees) || 0);
     const paid = isProPlan ? Number(planPrice) : (Number(formData.paid_fees) || 0);
     
@@ -138,7 +133,6 @@ function Dashboard() {
       const url = editingId ? `${API_URL}/api/student/update/${editingId}` : `${API_URL}/api/student/add`;
       const method = editingId ? 'PUT' : 'POST';
 
-      // Student record mein Due=0 bhej rahe hain kyunki due ab profile page automatically calculate karta hai
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -151,21 +145,38 @@ function Dashboard() {
         let studentIdForPlan = editingId || resultData.studentId;
 
         if (!editingId && studentIdForPlan) {
-            // Naya Bachha: Uska Initial Payment direct history mein selected month ke naam se dalega
-            if (!isProPlan && paid > 0) {
+            // 🚀 THE FIX: ALWAYS drop a "Billed Anchor" so profile knows the joining month!
+            if (!isProPlan) {
                 await fetch(`${API_URL}/api/fees/add`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({
                         student_id: studentIdForPlan, 
-                        amount: paid, 
+                        amount: baseMonthlyFee, 
                         paid_on: new Date().toISOString().split('T')[0],
-                        mode: 'Cash', 
-                        description: 'Initial Registration Payment', 
-                        status: 'Paid', 
-                        month: formMonth // Selected Joining Month
+                        mode: 'System', 
+                        description: 'Account Created Anchor', 
+                        status: 'Billed', 
+                        month: formMonth // Selected Past Month
                     })
                 });
+
+                // Add Paid entry only if amount > 0
+                if (paid > 0) {
+                    await fetch(`${API_URL}/api/fees/add`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            student_id: studentIdForPlan, 
+                            amount: paid, 
+                            paid_on: new Date().toISOString().split('T')[0],
+                            mode: 'Cash', 
+                            description: 'Initial Registration Payment', 
+                            status: 'Paid', 
+                            month: formMonth 
+                        })
+                    });
+                }
             }
         }
 
@@ -205,7 +216,6 @@ function Dashboard() {
     const tid = toast.loading("Fees jama ho rahi hai...");
     
     try {
-      // 1. Payment ko history mein daalo
       await fetch(`${API_URL}/api/fees/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -216,11 +226,10 @@ function Dashboard() {
           mode: payMode, 
           description: `Fees for Month(s)`, 
           status: "Paid", 
-          month: finalMonths // e.g. "Mar 2026"
+          month: finalMonths
         })
       });
 
-      // 2. Student ka Lifetime Paid update karo
       const newPaid = Number(quickPayStudent.paid_fees) + payAmt;
 
       await fetch(`${API_URL}/api/student/update/${quickPayStudent.id}`, {
@@ -283,7 +292,6 @@ function Dashboard() {
   return (
     <div className="p-4 bg-slate-100 min-h-screen font-sans relative">
       
-      {/* Navbar Header */}
       <div className="flex justify-between items-center max-w-7xl mx-auto mb-6 bg-white p-5 rounded-2xl shadow-sm border-b-4 border-indigo-600 flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-black text-indigo-900 tracking-tight">{config.appName} {config.mainEmoji}</h1>
@@ -295,7 +303,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Top Stats */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-sm border-l-8 border-indigo-500 flex justify-between items-center">
           <div><p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total {config.userType}s</p><h3 className="text-3xl font-black text-slate-800">{totalActive}</h3></div><div className="text-4xl">👥</div>
@@ -305,7 +312,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Registration Form */}
       <div className={`max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-t-8 ${editingId ? 'border-amber-400 bg-amber-50' : 'border-indigo-600'}`}>
         <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">{editingId ? `✏️ Update ${config.userType}` : `➕ New Student Registration`}</h2>
@@ -355,7 +361,6 @@ function Dashboard() {
         <input type="text" placeholder={`🔍 Search by Name or Mobile...`} className="bg-slate-50 border-none p-3 rounded-xl w-full max-w-md font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
-      {/* Student List */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 mb-20">
         <div className="overflow-x-auto">
             <table className="w-full text-left whitespace-nowrap">
@@ -393,7 +398,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Naya Quick Pay Popup (Month Selector) */}
       {quickPayStudent && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all border-t-8 border-green-500">
