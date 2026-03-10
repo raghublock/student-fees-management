@@ -9,11 +9,12 @@ function StudentProfile() {
   const [student, setStudent] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
   
-  // Naya State: Specific Mahine ki receipt print karne ke liye
   const [printMonthData, setPrintMonthData] = useState(null);
   
   const API_URL = config.apiUrl; 
   const token = localStorage.getItem('adminToken');
+
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   useEffect(() => {
     if (!token) return navigate('/');
@@ -57,7 +58,7 @@ function StudentProfile() {
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
   // =================================================================
-  // 🧠 THE MASTERPIECE: DYNAMIC MONTH-WISE LEDGER (Passbook Engine)
+  // 🧠 AUTOMATIC DYNAMIC MONTH-WISE LEDGER
   // =================================================================
   
   const baseFee = Number(student.total_fees || 0);
@@ -66,10 +67,9 @@ function StudentProfile() {
   let previousMonthSummary = null;
   let totalDueOverall = 0;
   let validTillText = "N/A";
-  let accountStatus = "Active / Regular";
+  let accountStatus = "🟢 Active & Regular";
 
   if (!student.has_active_plan) {
-      // 1. Pata lagao kis kis mahine ke paise aaye hain
       const monthPayments = {};
       const allMonthsSet = new Set();
       
@@ -86,17 +86,15 @@ function StudentProfile() {
           }
       });
 
-      // 2. Joining Date nikalna (Pehli history entry se)
       const sortedMonths = Array.from(allMonthsSet).sort((a,b) => new Date(a) - new Date(b));
       const currentMonthDate = new Date();
       const currentMonthStr = currentMonthDate.toLocaleString('default', { month: 'short', year: 'numeric' });
       
       let startMonthStr = sortedMonths.length > 0 ? sortedMonths[0] : currentMonthStr;
       
-      // 3. Start Month se Current Month tak ki List banana
       const startD = new Date(startMonthStr);
       let endD = new Date(); 
-      // Agar Advance aage tak ka diya hai, toh wahan tak list banegi
+      
       if (sortedMonths.length > 0) {
           const lastPaidD = new Date(sortedMonths[sortedMonths.length - 1]);
           if (lastPaidD > endD) endD = lastPaidD;
@@ -110,8 +108,7 @@ function StudentProfile() {
           curr.setMonth(curr.getMonth() + 1);
       }
 
-      // 4. MAIN ALGORITHM: Har mahine ka calculation (Carryover ke sath)
-      let carryOver = 0; // Positive = Advance, Negative = Due
+      let carryOver = 0; 
       let totalPaidLifetime = 0;
 
       timeline.forEach(m => {
@@ -126,10 +123,10 @@ function StudentProfile() {
 
           if (balance < 0) {
               due = Math.abs(balance);
-              carryOver = balance; // Due carry forward hogi
+              carryOver = balance; 
           } else {
               advance = balance;
-              carryOver = balance; // Advance carry forward hoga
+              carryOver = balance; 
           }
 
           ledger.push({
@@ -142,35 +139,31 @@ function StudentProfile() {
           });
       });
 
-      // Latest upar rakhne ke liye reverse
-      ledger.reverse();
+      ledger.reverse(); // Latest month on top
 
-      // Top box ke liye extract variables
-      currentMonthSummary = ledger.find(l => l.month === currentMonthStr) || ledger[0];
+      currentMonthSummary = ledger.find(l => l.month === currentMonthStr) || { base: baseFee, paid: 0, due: baseFee, advance: 0, netBalance: -baseFee };
       const currentIndex = ledger.findIndex(l => l.month === currentMonthStr);
-      previousMonthSummary = ledger[currentIndex + 1] || { due: 0, advance: 0, netBalance: 0 };
+      
+      previousMonthSummary = currentIndex !== -1 && ledger[currentIndex + 1] 
+                             ? ledger[currentIndex + 1] 
+                             : { due: 0, advance: 0, netBalance: 0 };
       
       totalDueOverall = currentMonthSummary.netBalance < 0 ? Math.abs(currentMonthSummary.netBalance) : 0;
 
-      // Valid Till Logic
       const fullyPaidCount = Math.floor(totalPaidLifetime / (baseFee || 1));
       let vm = startD.getMonth() + fullyPaidCount - 1;
       let vy = startD.getFullYear();
       while(vm > 11) { vm -= 12; vy++; }
       validTillText = fullyPaidCount > 0 ? `End of ${months[vm]} ${vy}` : 'N/A';
 
-      // 🚀 20 TAREEKH WALA DISCONTINUE LOGIC
+      // 20 TAREEKH DISCONTINUED LOGIC
       if (currentMonthDate.getDate() > 20 && currentMonthSummary.paid === 0 && totalDueOverall > 0) {
-          accountStatus = "🔴 Pending / Discontinued (Overdue)";
-      } else {
-          accountStatus = "🟢 Active & Regular";
+          accountStatus = "🔴 Pending / Discontinued";
       }
   }
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
-      
-      {/* ======================= SCREEN VIEW ======================= */}
       <div className="print:hidden">
         
         <div className="max-w-6xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
@@ -179,16 +172,15 @@ function StudentProfile() {
         </div>
 
         <div className="max-w-6xl mx-auto">
-            {/* TOP PROFILE AND FINANCIAL CARDS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 
                 {/* Info Card */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col md:flex-row items-center gap-8">
                     <img src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} alt="Profile" className="h-36 w-36 rounded-3xl object-cover border-4 border-indigo-50 shadow-md" />
                     <div className="text-center md:text-left space-y-2 w-full">
-                        <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{student.name}</h2>
+                        <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">{student.name}</h2>
                         
-                        <div className={`inline-block px-4 py-1.5 rounded-md font-black text-[10px] uppercase tracking-widest shadow-sm ${accountStatus.includes('🔴') ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+                        <div className={`inline-block px-4 py-1.5 rounded-md font-black text-xs uppercase tracking-widest shadow-sm ${accountStatus.includes('🔴') ? 'bg-red-100 text-red-700 border border-red-200 animate-pulse' : 'bg-green-100 text-green-700 border border-green-200'}`}>
                             {student.has_active_plan ? `PRO Plan Activated` : accountStatus}
                         </div>
 
@@ -213,16 +205,16 @@ function StudentProfile() {
                             
                             <div className="space-y-2 text-sm font-bold">
                                 <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
-                                    <span className="text-slate-300 text-xs uppercase">Current Month Base:</span> 
+                                    <span className="text-slate-400 text-[10px] tracking-widest uppercase">Current Month Base Fees:</span> 
                                     <span className="text-lg">₹{currentMonthSummary.base}</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
-                                    <span className="text-slate-300 text-xs uppercase">Current Month Paid:</span> 
+                                    <span className="text-slate-400 text-[10px] tracking-widest uppercase">Current Month Paid Fees:</span> 
                                     <span className="text-green-400 text-lg">₹{currentMonthSummary.paid}</span>
                                 </div>
                                 
                                 <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg border-l-4 border-amber-400">
-                                    <span className="text-slate-300 text-xs uppercase">Previous Mth {previousMonthSummary.netBalance < 0 ? 'Due' : 'Advance'}:</span> 
+                                    <span className="text-amber-200 text-[10px] tracking-widest uppercase">Prev Month {previousMonthSummary.netBalance < 0 ? 'Due' : 'Advance'}:</span> 
                                     <span className={previousMonthSummary.netBalance < 0 ? 'text-red-400' : 'text-blue-400'}>
                                         ₹{Math.abs(previousMonthSummary.netBalance)}
                                     </span>
@@ -233,7 +225,7 @@ function StudentProfile() {
                         <div className="mt-4 pt-4 border-t border-white/20">
                             <div className="flex justify-between items-end">
                                 <div>
-                                    <p className="text-[10px] uppercase text-slate-400 tracking-widest mb-1">Total Due Now</p>
+                                    <p className="text-[10px] uppercase text-slate-400 tracking-widest mb-1">Total Due</p>
                                     <p className={`text-3xl font-black ${totalDueOverall > 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>
                                         ₹{totalDueOverall}
                                     </p>
@@ -248,7 +240,7 @@ function StudentProfile() {
                 )}
             </div>
 
-            {/* 📜 NEW: MONTH-WISE SEPARATE TABLE (Passbook) */}
+            {/* 📜 MONTH-WISE SEPARATE TABLE */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className="bg-indigo-700 p-4 text-white font-black uppercase tracking-widest text-center text-sm">
                 📜 MONTH-WISE FEES SEPARATION LEDGER
@@ -260,9 +252,9 @@ function StudentProfile() {
                         <th className="p-4 border-b text-left pl-6">Month of Fees</th>
                         <th className="p-4 border-b text-center text-slate-600">Base Fees</th>
                         <th className="p-4 border-b text-center text-green-600">Paid Fees</th>
-                        <th className="p-4 border-b text-center text-blue-600">Advance</th>
+                        <th className="p-4 border-b text-center text-blue-600">Advance Fees</th>
                         <th className="p-4 border-b text-center text-red-500">Due Fees</th>
-                        <th className="p-4 border-b text-right pr-6">Action</th>
+                        <th className="p-4 border-b text-right pr-6">Fees Receipt</th>
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -306,9 +298,7 @@ function StudentProfile() {
         </div>
       </div>
 
-      {/* ================================================================= */}
-      {/* 🖨️ SPECIFIC MONTH PRINT VIEW (Jo mahina select kiya, wahi print hoga) */}
-      {/* ================================================================= */}
+      {/* 🖨️ SPECIFIC MONTH PRINT VIEW */}
       {printMonthData && (
       <div className="hidden print:block w-full max-w-3xl mx-auto bg-white text-black p-8 border-2 border-gray-800 outline-2 outline-offset-4 outline-black">
         <div className="flex justify-between items-end border-b-4 border-gray-800 pb-6 mb-6">
