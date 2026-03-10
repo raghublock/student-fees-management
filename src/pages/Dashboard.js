@@ -12,11 +12,11 @@ function Dashboard() {
   });
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [showPendingOnly, setShowPendingOnly] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false); 
 
+  // Mahino ki list ke liye naya logic
   const currentMonthName = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
   const [formMonth, setFormMonth] = useState(currentMonthName);
 
@@ -25,6 +25,7 @@ function Dashboard() {
   const [planDuration, setPlanDuration] = useState('');
   const [planPrice, setPlanPrice] = useState(''); 
 
+  // Month-wise Quick Pay State
   const [quickPayStudent, setQuickPayStudent] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState('Cash');
@@ -35,9 +36,10 @@ function Dashboard() {
   const token = localStorage.getItem('adminToken');
   const adminName = localStorage.getItem('adminName');
 
+  // Generate a list of months for selection
   const getMonthOptions = () => {
     const options = [];
-    const d = new Date(new Date().getFullYear(), 0, 1); 
+    const d = new Date(new Date().getFullYear(), 0, 1); // Start from Jan of current year
     for(let i = 0; i < 12; i++) {
       options.push(d.toLocaleString('default', { month: 'short', year: 'numeric' }));
       d.setMonth(d.getMonth() + 1);
@@ -127,6 +129,8 @@ function Dashboard() {
     if (isSubmitting) return; 
 
     setIsSubmitting(true);
+    
+    // Naya logic: Total fees ki jagah ab ye Base Monthly Fee ban chuka hai
     const baseMonthlyFee = isProPlan ? Number(planPrice) : (Number(formData.total_fees) || 0);
     const paid = isProPlan ? Number(planPrice) : (Number(formData.paid_fees) || 0);
     
@@ -134,6 +138,7 @@ function Dashboard() {
       const url = editingId ? `${API_URL}/api/student/update/${editingId}` : `${API_URL}/api/student/add`;
       const method = editingId ? 'PUT' : 'POST';
 
+      // Student record mein Due=0 bhej rahe hain kyunki due ab profile page automatically calculate karta hai
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -146,13 +151,19 @@ function Dashboard() {
         let studentIdForPlan = editingId || resultData.studentId;
 
         if (!editingId && studentIdForPlan) {
+            // Naya Bachha: Uska Initial Payment direct history mein selected month ke naam se dalega
             if (!isProPlan && paid > 0) {
                 await fetch(`${API_URL}/api/fees/add`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({
-                        student_id: studentIdForPlan, amount: paid, paid_on: new Date().toISOString().split('T')[0],
-                        mode: 'Cash', description: 'Initial Registration Payment', status: 'Paid', month: formMonth 
+                        student_id: studentIdForPlan, 
+                        amount: paid, 
+                        paid_on: new Date().toISOString().split('T')[0],
+                        mode: 'Cash', 
+                        description: 'Initial Registration Payment', 
+                        status: 'Paid', 
+                        month: formMonth // Selected Joining Month
                     })
                 });
             }
@@ -174,7 +185,7 @@ function Dashboard() {
         setPlanName('');
         setPlanDuration('');
         setPlanPrice('');
-        toast.success(editingId ? "Data Updated! ✏️" : `Saved & Activated! 📦✅`);
+        toast.success(editingId ? "Data Updated! ✏️" : `Student Registered Successfully! 📦✅`);
         fetchStudents(); 
       }
     } catch (error) { 
@@ -194,15 +205,22 @@ function Dashboard() {
     const tid = toast.loading("Fees jama ho rahi hai...");
     
     try {
+      // 1. Payment ko history mein daalo
       await fetch(`${API_URL}/api/fees/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
-          student_id: quickPayStudent.id, amount: payAmt, paid_on: new Date().toISOString().split('T')[0],
-          mode: payMode, description: "Monthly Fee Payment", status: "Paid", month: finalMonths
+          student_id: quickPayStudent.id, 
+          amount: payAmt, 
+          paid_on: new Date().toISOString().split('T')[0],
+          mode: payMode, 
+          description: `Fees for Month(s)`, 
+          status: "Paid", 
+          month: finalMonths // e.g. "Mar 2026"
         })
       });
 
+      // 2. Student ka Lifetime Paid update karo
       const newPaid = Number(quickPayStudent.paid_fees) + payAmt;
 
       await fetch(`${API_URL}/api/student/update/${quickPayStudent.id}`, {
@@ -223,7 +241,7 @@ function Dashboard() {
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm("Student hamesha ke liye delete ho jayega!")) {
+    if(window.confirm("Student aur uski saari history hamesha ke liye delete ho jayegi!")) {
       const tid = toast.loading("Database se delete ho raha hai... 🗑️");
       try {
         const res = await fetch(`${API_URL}/api/student/delete/${id}`, { 
@@ -264,6 +282,8 @@ function Dashboard() {
 
   return (
     <div className="p-4 bg-slate-100 min-h-screen font-sans relative">
+      
+      {/* Navbar Header */}
       <div className="flex justify-between items-center max-w-7xl mx-auto mb-6 bg-white p-5 rounded-2xl shadow-sm border-b-4 border-indigo-600 flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-black text-indigo-900 tracking-tight">{config.appName} {config.mainEmoji}</h1>
@@ -275,6 +295,7 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Top Stats */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-sm border-l-8 border-indigo-500 flex justify-between items-center">
           <div><p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total {config.userType}s</p><h3 className="text-3xl font-black text-slate-800">{totalActive}</h3></div><div className="text-4xl">👥</div>
@@ -284,9 +305,10 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Registration Form */}
       <div className={`max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-t-8 ${editingId ? 'border-amber-400 bg-amber-50' : 'border-indigo-600'}`}>
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">{editingId ? `✏️ Update ${config.userType}` : `➕ New Registration`}</h2>
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">{editingId ? `✏️ Update ${config.userType}` : `➕ New Student Registration`}</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -304,7 +326,7 @@ function Dashboard() {
               <div className="flex flex-col"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Base Monthly Fee (₹)</label><input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required={!isProPlan} /></div>
               <div className="flex flex-col"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Initial Amount Paid (₹)</label><input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-green-700" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required={!isProPlan} /></div>
               <div className="flex flex-col">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Select Joining Month</label>
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Joining Month</label>
                 <select className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700" value={formMonth} onChange={(e) => setFormMonth(e.target.value)}>{monthOptions.map(m => <option key={m} value={m}>{m}</option>)}</select>
               </div>
             </>
@@ -324,7 +346,7 @@ function Dashboard() {
           )}
           
           <button type="submit" disabled={isUploading || isSubmitting} className={`md:col-span-5 text-white font-black py-4 mt-2 rounded-xl shadow-lg transition-all uppercase tracking-widest ${(isUploading || isSubmitting) ? 'bg-slate-400 cursor-not-allowed' : editingId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-            {isSubmitting ? "Processing... ⏳" : editingId ? "Save Changes" : isProPlan ? `Register & Activate PRO Plan 🚀` : `Register Profile`}
+            {isSubmitting ? "Processing... ⏳" : editingId ? "Save Changes" : isProPlan ? `Register & Activate PRO Plan 🚀` : `Register Student 🚀`}
           </button>
         </form>
       </div>
@@ -333,6 +355,7 @@ function Dashboard() {
         <input type="text" placeholder={`🔍 Search by Name or Mobile...`} className="bg-slate-50 border-none p-3 rounded-xl w-full max-w-md font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
+      {/* Student List */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 mb-20">
         <div className="overflow-x-auto">
             <table className="w-full text-left whitespace-nowrap">
@@ -347,16 +370,18 @@ function Dashboard() {
                     <div><div className="font-black text-slate-800 text-sm uppercase flex items-center gap-2">{s.name}{s.has_active_plan && <span className="bg-gradient-to-r from-orange-400 to-orange-600 text-white text-[9px] px-2 py-0.5 rounded-md font-black shadow-sm uppercase tracking-widest border border-orange-200">PRO 📦</span>}</div><div className="text-[10px] font-bold text-slate-500 mt-0.5">📞 {s.mobile || 'No Number'}</div></div>
                     </td>
                     <td className="p-4">
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Base Fee: ₹{s.total_fees} | Lifetime Paid: ₹{s.paid_fees}</div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            Base Fee: ₹{s.total_fees} | Lifetime Paid: ₹{s.paid_fees}
+                        </div>
                     </td>
                     <td className="p-4 text-right">
                     <div className="flex gap-1.5 justify-end">
                         {!s.has_active_plan && (
                             <button onClick={() => { setQuickPayStudent(s); setSelectedMonths([]); }} className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-black transition text-[10px] uppercase flex items-center shadow-md">
-                                💸 Pay Monthly Fee
+                                💸 Pay Month Fees
                             </button>
                         )}
-                        <Link to={`/student/${s.id}`} className="bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-black hover:bg-indigo-200 transition text-[10px]">🗓️ Smart Profile</Link>
+                        <Link to={`/student/${s.id}`} className="bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-black hover:bg-indigo-200 transition text-[10px]">🗓️ Open Ledger</Link>
                         <button onClick={() => handleEdit(s)} className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-black hover:bg-amber-100 transition text-[10px]">✏️ Edit</button>
                         <button onClick={() => handleDelete(s.id)} className="bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-black hover:bg-red-100 transition text-[10px] flex items-center gap-1">🗑️ Delete</button>
                     </div>
@@ -368,6 +393,7 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Naya Quick Pay Popup (Month Selector) */}
       {quickPayStudent && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all border-t-8 border-green-500">
@@ -376,7 +402,7 @@ function Dashboard() {
             
             <form onSubmit={handleQuickPay} className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">1. Tick The Paying Months</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">1. Tick The Paying Month(s)</label>
                 <div className="flex flex-wrap gap-2 bg-slate-50 p-3 rounded-xl border-2 border-slate-100 max-h-40 overflow-y-auto">
                   {monthOptions.map(month => (
                     <span key={month} onClick={() => toggleMonth(month)} className={`cursor-pointer px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all shadow-sm ${selectedMonths.includes(month) ? 'bg-green-500 text-white border-green-600' : 'bg-white text-slate-500 border-slate-200 border hover:bg-slate-100'}`}>
@@ -390,7 +416,7 @@ function Dashboard() {
                 <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mode</label><select className="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-slate-500 outline-none font-bold text-slate-700 h-[52px]" value={payMode} onChange={(e) => setPayMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Card</option></select></div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => { setQuickPayStudent(null); setSelectedMonths([]); }} className="flex-1 bg-slate-100 text-slate-500 font-black py-3 rounded-xl hover:bg-slate-200 transition">Cancel</button>
+                <button type="button" onClick={() => { setQuickPayStudent(null); setSelectedMonths([]); setPayAmount(''); }} className="flex-1 bg-slate-100 text-slate-500 font-black py-3 rounded-xl hover:bg-slate-200 transition">Cancel</button>
                 <button type="submit" className="flex-1 text-white font-black py-3 rounded-xl shadow-lg transition uppercase tracking-widest bg-green-500 hover:bg-green-600">✅ Confirm</button>
               </div>
             </form>
