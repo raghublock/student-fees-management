@@ -58,7 +58,7 @@ function StudentProfile() {
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
   // =================================================================
-  // 🧠 AUTOMATIC DYNAMIC MONTH-WISE LEDGER
+  // 🧠 AUTOMATIC DYNAMIC MONTH-WISE LEDGER (Anchor Supported)
   // =================================================================
   
   const baseFee = Number(student.total_fees || 0);
@@ -71,32 +71,34 @@ function StudentProfile() {
 
   if (!student.has_active_plan) {
       const monthPayments = {};
-      const allMonthsSet = new Set();
+      const allKnownMonths = new Set(); // Yahan Billed aur Paid dono mahine ikkathe honge
       
       paymentHistory.forEach(p => {
-          if (p.status === 'Paid' && p.amount) {
-              const mStr = p.month || new Date(p.paid_on).toLocaleString('default', { month: 'short', year: 'numeric' });
-              const mArr = mStr.split(',').map(m => m.trim());
-              const splitAmt = Number(p.amount) / mArr.length;
+          if (p.month) {
+              const mArr = p.month.split(',').map(m => m.trim());
+              mArr.forEach(m => allKnownMonths.add(m)); // Anchor record karta hai
               
-              mArr.forEach(m => {
-                  monthPayments[m] = (monthPayments[m] || 0) + splitAmt;
-                  allMonthsSet.add(m);
-              });
+              if (p.status === 'Paid' && p.amount) {
+                  const splitAmt = Number(p.amount) / mArr.length;
+                  mArr.forEach(m => {
+                      monthPayments[m] = (monthPayments[m] || 0) + splitAmt;
+                  });
+              }
           }
       });
 
-      const sortedMonths = Array.from(allMonthsSet).sort((a,b) => new Date(a) - new Date(b));
+      // 🚀 THE FIX: Start Month ab strictly sabse pehle record se uthega (Anchor se)
+      const sortedKnownMonths = Array.from(allKnownMonths).sort((a,b) => new Date(a) - new Date(b));
       const currentMonthDate = new Date();
       const currentMonthStr = currentMonthDate.toLocaleString('default', { month: 'short', year: 'numeric' });
       
-      let startMonthStr = sortedMonths.length > 0 ? sortedMonths[0] : currentMonthStr;
+      let startMonthStr = sortedKnownMonths.length > 0 ? sortedKnownMonths[0] : currentMonthStr;
       
       const startD = new Date(startMonthStr);
       let endD = new Date(); 
       
-      if (sortedMonths.length > 0) {
-          const lastPaidD = new Date(sortedMonths[sortedMonths.length - 1]);
+      if (sortedKnownMonths.length > 0) {
+          const lastPaidD = new Date(sortedKnownMonths[sortedKnownMonths.length - 1]);
           if (lastPaidD > endD) endD = lastPaidD;
       }
 
@@ -139,7 +141,7 @@ function StudentProfile() {
           });
       });
 
-      ledger.reverse(); // Latest month on top
+      ledger.reverse(); 
 
       currentMonthSummary = ledger.find(l => l.month === currentMonthStr) || { base: baseFee, paid: 0, due: baseFee, advance: 0, netBalance: -baseFee };
       const currentIndex = ledger.findIndex(l => l.month === currentMonthStr);
@@ -156,7 +158,6 @@ function StudentProfile() {
       while(vm > 11) { vm -= 12; vy++; }
       validTillText = fullyPaidCount > 0 ? `End of ${months[vm]} ${vy}` : 'N/A';
 
-      // 20 TAREEKH DISCONTINUED LOGIC
       if (currentMonthDate.getDate() > 20 && currentMonthSummary.paid === 0 && totalDueOverall > 0) {
           accountStatus = "🔴 Pending / Discontinued";
       }
@@ -164,6 +165,7 @@ function StudentProfile() {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
+      
       <div className="print:hidden">
         
         <div className="max-w-6xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
@@ -174,7 +176,6 @@ function StudentProfile() {
         <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 
-                {/* Info Card */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col md:flex-row items-center gap-8">
                     <img src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} alt="Profile" className="h-36 w-36 rounded-3xl object-cover border-4 border-indigo-50 shadow-md" />
                     <div className="text-center md:text-left space-y-2 w-full">
@@ -197,7 +198,6 @@ function StudentProfile() {
                     </div>
                 </div>
 
-                {/* EXACT REQUESTED FINANCIAL BOX */}
                 {!student.has_active_plan && currentMonthSummary && (
                     <div className="bg-slate-900 p-6 rounded-3xl text-white shadow-2xl border-t-8 border-indigo-500 flex flex-col justify-between">
                         <div>
