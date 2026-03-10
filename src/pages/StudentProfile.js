@@ -12,6 +12,8 @@ function StudentProfile() {
   const API_URL = config.apiUrl; 
   const token = localStorage.getItem('adminToken');
 
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
   useEffect(() => {
     if (!token) return navigate('/');
     
@@ -50,63 +52,128 @@ function StudentProfile() {
 
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
+  // ==========================================
+  // 🧠 FLAWLESS MATH & SMART CALENDAR LOGIC
+  // ==========================================
   let expiryDisplay = 'N/A';
-  let latestPayment = null;
-  
-  if (paymentHistory.length > 0) {
-      latestPayment = paymentHistory[0]; 
-      if (student.has_active_plan) {
-          expiryDisplay = latestPayment.expiry_date 
-            ? new Date(latestPayment.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
-            : 'N/A';
-      } else {
-          if (latestPayment.month) {
-              const monthsArr = latestPayment.month.split(',').map(m => m.trim());
-              const lastMonth = monthsArr[monthsArr.length - 1]; 
-              expiryDisplay = `End of ${lastMonth}`;
-          } else if (latestPayment.paid_on) {
-              const d = new Date(latestPayment.paid_on);
-              d.setDate(d.getDate() + 30);
-              expiryDisplay = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  let autoCalculatedDue = 0;
+  let totalPaidAmount = 0;
+  const baseFee = Number(student.total_fees || 0);
+
+  const currentYear = new Date().getFullYear();
+  const currentMonthIndex = new Date().getMonth(); 
+
+  let joiningMonthIndex = currentMonthIndex;
+  let joiningYear = currentYear;
+  const paidMonths = new Set();
+
+  if (!student.has_active_plan && paymentHistory.length > 0) {
+      // 1. Total Paid Amount Nikalna aur Paid Months track karna
+      paymentHistory.forEach(p => {
+          if (p.status === 'Paid') {
+              totalPaidAmount += Number(p.amount || 0);
+              if (p.month) p.month.split(',').forEach(m => paidMonths.add(m.trim()));
           }
+      });
+
+      // 2. Joining Date Pata Lagana (Sabse pehli history entry se)
+      const sortedHistory = [...paymentHistory].sort((a, b) => new Date(a.paid_on || a.start_date) - new Date(b.paid_on || b.start_date));
+      const firstTx = sortedHistory[0];
+      
+      if (firstTx.month && firstTx.month.includes(' ')) {
+          const firstMonthStr = firstTx.month.split(',')[0].trim();
+          const [mName, yStr] = firstMonthStr.split(' ');
+          const mIdx = months.indexOf(mName);
+          if (mIdx !== -1) {
+              joiningMonthIndex = mIdx;
+              joiningYear = parseInt(yStr) || joiningYear;
+          }
+      } else if (firstTx.paid_on) {
+          const d = new Date(firstTx.paid_on);
+          joiningMonthIndex = d.getMonth();
+          joiningYear = d.getFullYear();
       }
+
+      // 3. Active Months Count (Joining se lekar ab tak kitne mahine hue)
+      let activeMonthsCount = 0;
+      if (currentYear === joiningYear) {
+          activeMonthsCount = Math.max(0, currentMonthIndex - joiningMonthIndex + 1);
+      } else if (currentYear > joiningYear) {
+          activeMonthsCount = (12 - joiningMonthIndex) + currentMonthIndex + 1 + (currentYear - joiningYear - 1) * 12;
+      }
+
+      // 4. Exact Due Calculation (Total Lagni Chahiye thi - Total Aa Gayi)
+      const totalBilledSoFar = activeMonthsCount * baseFee;
+      autoCalculatedDue = totalBilledSoFar - totalPaidAmount;
+
+      // 5. Valid Till Calculation (Paison ke hisaab se kitne mahine cover hue)
+      const fullyPaidMonths = Math.floor(totalPaidAmount / (baseFee || 1));
+      let vMonth = joiningMonthIndex + fullyPaidMonths - 1;
+      let vYear = joiningYear;
+      while(vMonth > 11) { vMonth -= 12; vYear++; }
+      
+      if (fullyPaidMonths > 0) {
+          expiryDisplay = `End of ${months[vMonth]} ${vYear}`;
+      } else {
+          expiryDisplay = `Due from ${months[joiningMonthIndex]} ${joiningYear}`;
+      }
+  } else if (student.has_active_plan && paymentHistory.length > 0) {
+      expiryDisplay = paymentHistory[0].expiry_date ? new Date(paymentHistory[0].expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
   }
 
-  // 🗓️ 12-MONTH SMART CALENDAR LOGIC (Bina kisi button ke Auto-Math)
-  const currentYear = new Date().getFullYear();
-  const currentMonthIndex = new Date().getMonth(); // 0 (Jan) se 11 (Dec)
-  
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  
+  // 6. Generate 12-Month Calendar
   const calendarGrid = months.map((m, index) => {
       const monthStr = `${m} ${currentYear}`;
-      
-      // System check karega ki History mein is mahine ka koi 'Paid' record hai kya?
-      const isPaid = paymentHistory.some(p => p.status === 'Paid' && p.month && p.month.includes(monthStr));
-      
-      let status = 'upcoming'; // Default (Future months)
-      if (isPaid) {
+      const isPaid = paidMonths.has(monthStr);
+
+      let status = 'upcoming';
+      // Agar joining se pehle ka mahina hai toh "Not Joined" (Greyed out)
+      if (currentYear < joiningYear || (currentYear === joiningYear && index < joiningMonthIndex)) {
+          status = 'not_joined';
+      } else if (isPaid) {
           status = 'paid';
       } else if (index < currentMonthIndex) {
-          status = 'due_past'; // Pichla mahina jo abhi tak nahi diya
+          status = 'due_past';
       } else if (index === currentMonthIndex) {
-          status = 'due_current'; // Current mahina jiska time aa gaya hai
+          status = 'due_current';
       }
-      
       return { monthStr, shortMonth: m, status };
   });
 
-  // Calculate Total Pending Months automatically
-  const dueMonthsCount = calendarGrid.filter(c => c.status === 'due_past' || c.status === 'due_current').length;
-  // Calculate Total Live Due Amount (Base Fee x Pending Months)
-  const autoCalculatedDue = dueMonthsCount * (Number(student.total_fees) || 0);
+  // 7. Table Data with Cumulative Due
+  let cumulativePaid = 0;
+  const historyWithDetails = [...paymentHistory].filter(p => p.status === 'Paid').sort((a,b) => new Date(a.paid_on) - new Date(b.paid_on)).map((p) => {
+      cumulativePaid += Number(p.amount || 0);
+      
+      const pDate = new Date(p.paid_on);
+      const pYear = pDate.getFullYear();
+      const pMonth = pDate.getMonth();
+      
+      let mPassed = 0;
+      if (pYear === joiningYear) {
+          mPassed = Math.max(0, pMonth - joiningMonthIndex + 1);
+      } else if (pYear > joiningYear) {
+          mPassed = (12 - joiningMonthIndex) + pMonth + 1 + (pYear - joiningYear - 1) * 12;
+      }
+      
+      const billedAtThatTime = mPassed * baseFee;
+      const dueAtThatTime = billedAtThatTime - cumulativePaid;
+
+      const fPaidMonths = Math.floor(cumulativePaid / (baseFee || 1));
+      let vm = joiningMonthIndex + fPaidMonths - 1;
+      let vy = joiningYear;
+      while(vm > 11) { vm -= 12; vy++; }
+      const vTillStr = fPaidMonths > 0 ? `End of ${months[vm]} ${vy}` : 'N/A';
+
+      return { ...p, dueAtThatTime, vTillStr };
+  }).reverse(); // Newest first
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
       <div className="print:hidden">
         
         {/* Header */}
-        <div className="max-w-5xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
+        <div className="max-w-6xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
             <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} {config.mainEmoji}</h1>
             <div className="flex gap-3">
             <button onClick={handlePrint} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-black shadow-md hover:bg-indigo-700 transition active:scale-95">🖨️ Print Receipt</button>
@@ -114,7 +181,7 @@ function StudentProfile() {
             </div>
         </div>
 
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
             {/* Top Profile Box */}
             <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
             <img 
@@ -142,7 +209,7 @@ function StudentProfile() {
 
                 <div className="pt-5">
                 <a 
-                    href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(dueMonthsCount > 0 ? `Namaste ${student.name}, Aapki ${config.appName} ki fees pichle ${dueMonthsCount} mahine se due hai. Kripya ₹${autoCalculatedDue} jama karwayein.` : `Namaste ${student.name}, Aapka ${config.appName} ka account ekdum clear hai. Thank you!`)}`} 
+                    href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(autoCalculatedDue > 0 ? `Namaste ${student.name}, Aapki ${config.appName} ki fees ₹${autoCalculatedDue} due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka ${config.appName} ka account ekdum clear hai. Thank you!`)}`} 
                     target="_blank" rel="noreferrer"
                     className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2.5 rounded-xl font-black shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all uppercase tracking-widest text-xs"
                 >
@@ -160,19 +227,23 @@ function StudentProfile() {
                     
                     <div className="flex justify-between opacity-80">
                         <span>Base Fee/Month:</span> 
-                        <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.total_fees}</span>
+                        <span>₹{student.has_active_plan ? (paymentHistory[0]?.price || '...') : student.total_fees}</span>
                     </div>
                     
                     <div className="flex justify-between text-green-400">
                         <span>Total Lifetime Paid:</span> 
-                        <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.paid_fees}</span>
+                        <span>₹{student.has_active_plan ? (paymentHistory[0]?.price || '...') : totalPaidAmount}</span>
                     </div>
                     
                     {!student.has_active_plan && (
                     <div className="pt-2 mt-2 border-t border-white/20">
-                        {dueMonthsCount > 0 ? (
+                        {autoCalculatedDue > 0 ? (
                             <div className="flex justify-between text-red-400 text-xl font-black italic underline">
                                 <span>Total Due:</span> <span>₹{autoCalculatedDue}</span>
+                            </div>
+                        ) : autoCalculatedDue < 0 ? (
+                            <div className="flex justify-between text-blue-400 text-xl font-black italic underline">
+                                <span>Advance:</span> <span>₹{Math.abs(autoCalculatedDue)}</span>
                             </div>
                         ) : (
                             <div className="flex justify-between text-green-400 text-lg font-black italic">
@@ -193,7 +264,7 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* 📅 NAYA VIP CALENDAR GRID */}
+            {/* 📅 SMART VIP CALENDAR GRID */}
             {!student.has_active_plan && (
                 <div className="mb-10 bg-white p-6 rounded-3xl shadow-xl border border-gray-100">
                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b pb-2 flex justify-between items-center">
@@ -204,14 +275,15 @@ function StudentProfile() {
                     <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                         {calendarGrid.map((c, idx) => (
                             <div key={idx} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${
+                                c.status === 'not_joined' ? 'bg-slate-100 border-slate-200 text-slate-300 opacity-50' :
                                 c.status === 'paid' ? 'bg-green-50 border-green-500 text-green-700 shadow-sm' :
                                 c.status === 'due_current' ? 'bg-orange-50 border-orange-500 text-orange-600 shadow-md animate-pulse' :
                                 c.status === 'due_past' ? 'bg-red-50 border-red-500 text-red-600 shadow-md' :
                                 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
                             }`}>
                                 <span className="text-xl font-black">{c.shortMonth}</span>
-                                <span className="text-[9px] font-black uppercase tracking-widest">
-                                    {c.status === 'paid' ? '✅ Paid' : c.status === 'due_current' ? '⚠️ Due Now' : c.status === 'due_past' ? '❌ Defaulter' : 'Upcoming'}
+                                <span className="text-[8px] font-black uppercase tracking-widest">
+                                    {c.status === 'not_joined' ? '🚫 N/A' : c.status === 'paid' ? '✅ Paid' : c.status === 'due_current' ? '⚠️ Due Now' : c.status === 'due_past' ? '❌ Defaulter' : 'Upcoming'}
                                 </span>
                             </div>
                         ))}
@@ -219,47 +291,65 @@ function StudentProfile() {
                 </div>
             )}
 
-            {/* 📜 TRANSACTION PASSBOOK (Sirf Paid entries dikhayega) */}
+            {/* 📜 NEW: DETAILED PAYMENT RECEIPTS TABLE */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-slate-800'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
                 {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 DETAILED PAYMENT RECEIPTS'}
             </div>
-            <table className="w-full text-center border-collapse">
-                <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                <tr>
-                    <th className="p-4 border-b text-left pl-6">Paid On Date</th>
-                    <th className="p-4 border-b text-left">Description & Covered Month</th>
-                    <th className="p-4 border-b text-green-500 text-right pr-6">Amount Received</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                {paymentHistory.filter(item => item.status === 'Paid').length > 0 ? paymentHistory.filter(item => item.status === 'Paid').map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                    
-                    <td className="p-4 font-bold text-slate-500 uppercase text-xs text-left pl-6">
-                        {item.start_date || (item.paid_on ? new Date(item.paid_on).toLocaleDateString('en-IN') : 'N/A')}
-                    </td>
-                    
-                    <td className="p-4 text-xs font-black text-slate-700 text-left">
-                        {item.plan_name || item.description || 'Fees Payment'}
-                        <br/>
-                        {item.month && (
-                            <span className="text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block border border-indigo-100 font-black uppercase">
-                                🗓️ Paid For: {item.month}
-                            </span>
-                        )}
-                    </td>
-
-                    <td className="p-4 font-black text-green-600 text-lg text-right pr-6">
-                        +₹{item.amount || item.price}
-                    </td>
-
+            <div className="overflow-x-auto">
+                <table className="w-full text-center border-collapse">
+                    <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                    <tr>
+                        <th className="p-4 border-b text-left pl-6">Payment Date</th>
+                        <th className="p-4 border-b text-left">Covered Month</th>
+                        <th className="p-4 border-b text-green-500">Amount Paid</th>
+                        <th className="p-4 border-b text-blue-500">Valid Till / Expiry</th>
+                        <th className="p-4 border-b text-red-500 text-right pr-6">Remaining Due</th>
                     </tr>
-                )) : (
-                    <tr><td colSpan="3" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No payment history found.</td></tr>
-                )}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                    {student.has_active_plan ? (
+                        // PRO Plan History
+                        paymentHistory.filter(item => item.price).map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50">
+                                <td className="p-4 text-left pl-6 font-bold text-xs">{item.start_date}</td>
+                                <td className="p-4 text-left font-black text-indigo-700 text-xs">{item.plan_name}</td>
+                                <td className="p-4 text-green-600 font-black">₹{item.price}</td>
+                                <td className="p-4 text-blue-600 font-black text-xs">{new Date(item.expiry_date).toLocaleDateString('en-IN')}</td>
+                                <td className="p-4 text-right pr-6 font-black text-slate-400">₹0</td>
+                            </tr>
+                        ))
+                    ) : (
+                        // Regular Student History With Live Math
+                        historyWithDetails.length > 0 ? historyWithDetails.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
+                            
+                            <td className="p-4 font-bold text-slate-600 uppercase text-xs text-left pl-6">
+                                🗓️ {item.paid_on ? new Date(item.paid_on).toLocaleDateString('en-IN') : 'Manual Entry'}
+                            </td>
+                            
+                            <td className="p-4 text-[10px] font-black text-indigo-700 text-left">
+                                {item.month ? item.month.split(',').map(m => <span key={m} className="bg-indigo-50 border border-indigo-100 px-2 py-1 rounded mr-1 inline-block uppercase tracking-wider">{m.trim()}</span>) : 'Fees Payment'}
+                            </td>
+
+                            <td className="p-4 font-black text-green-600 text-sm">
+                                +₹{item.amount}
+                            </td>
+
+                            <td className="p-4 font-black text-blue-600 text-xs">
+                                ⏳ {item.vTillStr}
+                            </td>
+
+                            <td className="p-4 font-black text-right pr-6">
+                                {item.dueAtThatTime > 0 ? <span className="text-red-500">₹{item.dueAtThatTime}</span> : item.dueAtThatTime < 0 ? <span className="text-blue-400">Adv: ₹{Math.abs(item.dueAtThatTime)}</span> : <span className="text-green-500">₹0</span>}
+                            </td>
+
+                            </tr>
+                        )) : <tr><td colSpan="5" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No payment records found.</td></tr>
+                    )}
+                    </tbody>
+                </table>
+            </div>
             </div>
 
         </div>
@@ -320,7 +410,7 @@ function StudentProfile() {
             </tbody>
         </table>
 
-        {!student.has_active_plan && dueMonthsCount > 0 && (
+        {!student.has_active_plan && autoCalculatedDue > 0 && (
             <div className="flex justify-end mb-8">
                <div className="border-2 border-gray-800 p-3 w-64 flex justify-between bg-gray-100">
                   <span className="font-black uppercase text-xs tracking-widest">Total Due Balance:</span>
