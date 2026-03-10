@@ -127,7 +127,7 @@ function Dashboard() {
 
     setIsSubmitting(true);
     const baseMonthlyFee = isProPlan ? Number(planPrice) : (Number(formData.total_fees) || 0);
-    const paid = isProPlan ? Number(planPrice) : (Number(formData.paid_fees) || 0);
+    const paid = editingId ? Number(formData.paid_fees) : (isProPlan ? Number(planPrice) : (Number(formData.paid_fees) || 0));
     
     try {
       const url = editingId ? `${API_URL}/api/student/update/${editingId}` : `${API_URL}/api/student/add`;
@@ -144,43 +144,32 @@ function Dashboard() {
       if (response.ok) {
         let studentIdForPlan = editingId || resultData.studentId;
 
+        // Sirf nayi entry par history banegi
         if (!editingId && studentIdForPlan) {
-            // 🚀 THE FIX: ALWAYS drop a "Billed Anchor" so profile knows the joining month!
             if (!isProPlan) {
                 await fetch(`${API_URL}/api/fees/add`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({
-                        student_id: studentIdForPlan, 
-                        amount: baseMonthlyFee, 
-                        paid_on: new Date().toISOString().split('T')[0],
-                        mode: 'System', 
-                        description: 'Account Created Anchor', 
-                        status: 'Billed', 
-                        month: formMonth // Selected Past Month
+                        student_id: studentIdForPlan, amount: baseMonthlyFee, paid_on: new Date().toISOString().split('T')[0],
+                        mode: 'System', description: 'Account Created Anchor', status: 'Billed', month: formMonth 
                     })
                 });
 
-                // Add Paid entry only if amount > 0
                 if (paid > 0) {
                     await fetch(`${API_URL}/api/fees/add`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({
-                            student_id: studentIdForPlan, 
-                            amount: paid, 
-                            paid_on: new Date().toISOString().split('T')[0],
-                            mode: 'Cash', 
-                            description: 'Initial Registration Payment', 
-                            status: 'Paid', 
-                            month: formMonth 
+                            student_id: studentIdForPlan, amount: paid, paid_on: new Date().toISOString().split('T')[0],
+                            mode: 'Cash', description: 'Initial Registration Payment', status: 'Paid', month: formMonth 
                         })
                     });
                 }
             }
         }
 
-        if (isProPlan && studentIdForPlan) {
+        if (isProPlan && !editingId && studentIdForPlan) {
              await fetch(`${API_URL}/api/plans/purchase`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -196,7 +185,7 @@ function Dashboard() {
         setPlanName('');
         setPlanDuration('');
         setPlanPrice('');
-        toast.success(editingId ? "Data Updated! ✏️" : `Student Registered Successfully! 📦✅`);
+        toast.success(editingId ? "Profile Updated! ✏️" : `Student Registered Successfully! 📦✅`);
         fetchStudents(); 
       }
     } catch (error) { 
@@ -220,13 +209,8 @@ function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
-          student_id: quickPayStudent.id, 
-          amount: payAmt, 
-          paid_on: new Date().toISOString().split('T')[0],
-          mode: payMode, 
-          description: `Fees for Month(s)`, 
-          status: "Paid", 
-          month: finalMonths
+          student_id: quickPayStudent.id, amount: payAmt, paid_on: new Date().toISOString().split('T')[0],
+          mode: payMode, description: `Fees for Month(s)`, status: "Paid", month: finalMonths
         })
       });
 
@@ -314,7 +298,7 @@ function Dashboard() {
 
       <div className={`max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-t-8 ${editingId ? 'border-amber-400 bg-amber-50' : 'border-indigo-600'}`}>
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">{editingId ? `✏️ Update ${config.userType}` : `➕ New Student Registration`}</h2>
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">{editingId ? `✏️ Update Base Fee & Info` : `➕ New Student Registration`}</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -330,30 +314,29 @@ function Dashboard() {
           {!isProPlan && (
             <>
               <div className="flex flex-col"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Base Monthly Fee (₹)</label><input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold" value={formData.total_fees} onChange={(e) => setFormData({...formData, total_fees: e.target.value})} required={!isProPlan} /></div>
-              <div className="flex flex-col"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Initial Amount Paid (₹)</label><input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-green-700" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required={!isProPlan} /></div>
-              <div className="flex flex-col">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Joining Month</label>
-                <select className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700" value={formMonth} onChange={(e) => setFormMonth(e.target.value)}>{monthOptions.map(m => <option key={m} value={m}>{m}</option>)}</select>
-              </div>
+              
+              {/* 🚀 FIX: Edit karte time Paid Amount ka column hide rahega, taaki galti se bhi record mess up na ho */}
+              {!editingId && (
+                  <>
+                  <div className="flex flex-col"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Initial Amount Paid (₹)</label><input type="number" className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-green-700" value={formData.paid_fees} onChange={(e) => setFormData({...formData, paid_fees: e.target.value})} required={!isProPlan} /></div>
+                  <div className="flex flex-col">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Joining Month</label>
+                    <select className="border-2 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700" value={formMonth} onChange={(e) => setFormMonth(e.target.value)}>{monthOptions.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                  </div>
+                  </>
+              )}
             </>
-          )}
-
-          <div className="col-span-1 md:col-span-5 flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
-             <input type="checkbox" id="proPlan" checked={isProPlan} onChange={(e) => setIsProPlan(e.target.checked)} className="w-5 h-5 accent-orange-500 cursor-pointer" />
-             <label htmlFor="proPlan" className="font-black text-orange-600 uppercase tracking-widest text-xs cursor-pointer">📦 Activate Custom PRO Plan (Lump Sum / 3-Month etc.)</label>
-          </div>
-
-          {isProPlan && (
-             <div className="col-span-1 md:col-span-5 grid grid-cols-1 md:grid-cols-3 gap-3 bg-orange-50 p-4 rounded-xl border border-orange-200 mb-2 shadow-inner">
-                 <div className="flex flex-col"><label className="text-[9px] font-black text-orange-500 uppercase ml-1">Plan Name</label><input type="text" placeholder="e.g. 3-Months Special" className="border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none font-bold text-orange-800" value={planName} onChange={(e) => setPlanName(e.target.value)} required={isProPlan} /></div>
-                 <div className="flex flex-col"><label className="text-[9px] font-black text-orange-500 uppercase ml-1">Duration (Months)</label><input type="number" placeholder="e.g. 3" className="border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none font-bold text-orange-800" value={planDuration} onChange={(e) => setPlanDuration(e.target.value)} required={isProPlan} /></div>
-                 <div className="flex flex-col"><label className="text-[9px] font-black text-orange-500 uppercase ml-1">Plan Fees (₹) - Fully Paid</label><input type="number" placeholder="e.g. 1500" className="border-2 border-orange-400 p-3 rounded-xl focus:border-orange-600 outline-none font-black text-orange-700 bg-white" value={planPrice} onChange={(e) => setPlanPrice(e.target.value)} required={isProPlan} /></div>
-             </div>
           )}
           
           <button type="submit" disabled={isUploading || isSubmitting} className={`md:col-span-5 text-white font-black py-4 mt-2 rounded-xl shadow-lg transition-all uppercase tracking-widest ${(isUploading || isSubmitting) ? 'bg-slate-400 cursor-not-allowed' : editingId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-            {isSubmitting ? "Processing... ⏳" : editingId ? "Save Changes" : isProPlan ? `Register & Activate PRO Plan 🚀` : `Register Student 🚀`}
+            {isSubmitting ? "Processing... ⏳" : editingId ? "Save Profile Changes" : isProPlan ? `Register & Activate PRO Plan 🚀` : `Register Student 🚀`}
           </button>
+
+          {editingId && (
+             <button type="button" onClick={() => { setEditingId(null); setFormData({ name: '', total_fees: '', paid_fees: '', mobile: '', whatsapp: '', photo: '' }); }} className="md:col-span-5 bg-slate-200 text-slate-700 font-black py-2 rounded-xl hover:bg-slate-300 uppercase tracking-widest text-sm">
+                 Cancel Edit
+             </button>
+          )}
         </form>
       </div>
 
@@ -387,7 +370,7 @@ function Dashboard() {
                             </button>
                         )}
                         <Link to={`/student/${s.id}`} className="bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-black hover:bg-indigo-200 transition text-[10px]">🗓️ Open Ledger</Link>
-                        <button onClick={() => handleEdit(s)} className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-black hover:bg-amber-100 transition text-[10px]">✏️ Edit</button>
+                        <button onClick={() => handleEdit(s)} className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-black hover:bg-amber-100 transition text-[10px]">✏️ Edit Base Fee</button>
                         <button onClick={() => handleDelete(s.id)} className="bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-black hover:bg-red-100 transition text-[10px] flex items-center gap-1">🗑️ Delete</button>
                     </div>
                     </td>
