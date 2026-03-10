@@ -72,43 +72,34 @@ function StudentProfile() {
       }
   }
 
-  // 📊 SUPER SMART MONTH-WISE LOGIC (Flawless Math Fix)
-  const ledgerMap = {};
-  let totalBilledInHistory = 0; // Track karne ke liye ki kitna bill hume pata hai
-
-  if (!student.has_active_plan && paymentHistory.length > 0) {
-      paymentHistory.forEach(item => {
-          const mStr = item.month || new Date(item.paid_on).toLocaleString('default', { month: 'short', year: 'numeric' });
-          const monthsArr = mStr.split(',').map(m => m.trim());
-          const amountPerMonth = Number(item.amount || item.price || 0) / monthsArr.length;
-
-          monthsArr.forEach(m => {
-              if (!ledgerMap[m]) {
-                  ledgerMap[m] = { monthName: m, billed: 0, paid: 0 };
-              }
-              if (item.status === 'Billed') {
-                  ledgerMap[m].billed += amountPerMonth;
-                  totalBilledInHistory += amountPerMonth; // Count all explicit bills
-              } else {
-                  ledgerMap[m].paid += amountPerMonth;
-              }
-          });
-      });
-  }
-
-  // Naye mahine ko upar rakhne ke liye sort karna
-  const monthlyPassbook = Object.values(ledgerMap).sort((a, b) => new Date(b.monthName) - new Date(a.monthName));
-
-  // 🚀 THE ULTIMATE FIX FOR LEGACY ENTRIES:
-  // Agar Total Fees (1600) humare Billed History (800) se zyada hai,
-  // toh iska matlab bacha hua 800 purane/pehle mahine ka bill tha jo add nahi hua.
-  if (!student.has_active_plan && monthlyPassbook.length > 0) {
-      const missingBilled = Number(student.total_fees) - totalBilledInHistory;
-      if (missingBilled > 0) {
-          // Sabse purana mahina array mein sabse aakhir mein hoga
-          monthlyPassbook[monthlyPassbook.length - 1].billed += missingBilled;
+  // 🗓️ 12-MONTH SMART CALENDAR LOGIC (Bina kisi button ke Auto-Math)
+  const currentYear = new Date().getFullYear();
+  const currentMonthIndex = new Date().getMonth(); // 0 (Jan) se 11 (Dec)
+  
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  const calendarGrid = months.map((m, index) => {
+      const monthStr = `${m} ${currentYear}`;
+      
+      // System check karega ki History mein is mahine ka koi 'Paid' record hai kya?
+      const isPaid = paymentHistory.some(p => p.status === 'Paid' && p.month && p.month.includes(monthStr));
+      
+      let status = 'upcoming'; // Default (Future months)
+      if (isPaid) {
+          status = 'paid';
+      } else if (index < currentMonthIndex) {
+          status = 'due_past'; // Pichla mahina jo abhi tak nahi diya
+      } else if (index === currentMonthIndex) {
+          status = 'due_current'; // Current mahina jiska time aa gaya hai
       }
-  }
+      
+      return { monthStr, shortMonth: m, status };
+  });
+
+  // Calculate Total Pending Months automatically
+  const dueMonthsCount = calendarGrid.filter(c => c.status === 'due_past' || c.status === 'due_current').length;
+  // Calculate Total Live Due Amount (Base Fee x Pending Months)
+  const autoCalculatedDue = dueMonthsCount * (Number(student.total_fees) || 0);
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
@@ -142,7 +133,7 @@ function StudentProfile() {
                 )}
                 </div>
                 <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">
-                Account Status: {student.has_active_plan ? `Custom ${config.planLabel} Activated` : 'Regular Monthly Fees'}
+                Account Status: {student.has_active_plan ? `Custom ${config.planLabel} Activated` : 'Smart Monthly Calendar'}
                 </p>
                 <div className="pt-4 text-sm font-bold text-slate-600 grid grid-cols-1 md:grid-cols-2 gap-2 uppercase">
                     <p>📞 {student.mobile || 'N/A'}</p>
@@ -151,7 +142,7 @@ function StudentProfile() {
 
                 <div className="pt-5">
                 <a 
-                    href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(Number(student.due_fees) > 0 ? `Namaste ${student.name}, Aapki ${config.appName} ki ₹${student.due_fees} fees due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka ${config.appName} ka account ekdum clear hai. Thank you!`)}`} 
+                    href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(dueMonthsCount > 0 ? `Namaste ${student.name}, Aapki ${config.appName} ki fees pichle ${dueMonthsCount} mahine se due hai. Kripya ₹${autoCalculatedDue} jama karwayein.` : `Namaste ${student.name}, Aapka ${config.appName} ka account ekdum clear hai. Thank you!`)}`} 
                     target="_blank" rel="noreferrer"
                     className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2.5 rounded-xl font-black shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all uppercase tracking-widest text-xs"
                 >
@@ -168,28 +159,24 @@ function StudentProfile() {
                 <div className="space-y-3 text-sm font-bold">
                     
                     <div className="flex justify-between opacity-80">
-                        <span>Lifetime Billed:</span> 
+                        <span>Base Fee/Month:</span> 
                         <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.total_fees}</span>
                     </div>
                     
                     <div className="flex justify-between text-green-400">
-                        <span>Lifetime Paid:</span> 
+                        <span>Total Lifetime Paid:</span> 
                         <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.paid_fees}</span>
                     </div>
                     
                     {!student.has_active_plan && (
                     <div className="pt-2 mt-2 border-t border-white/20">
-                        {Number(student.due_fees) > 0 ? (
+                        {dueMonthsCount > 0 ? (
                             <div className="flex justify-between text-red-400 text-xl font-black italic underline">
-                                <span>Total Due:</span> <span>₹{student.due_fees}</span>
-                            </div>
-                        ) : Number(student.due_fees) < 0 ? (
-                            <div className="flex justify-between text-blue-400 text-xl font-black italic underline">
-                                <span>Advance:</span> <span>₹{Math.abs(student.due_fees)}</span>
+                                <span>Total Due:</span> <span>₹{autoCalculatedDue}</span>
                             </div>
                         ) : (
                             <div className="flex justify-between text-green-400 text-lg font-black italic">
-                                <span>Status:</span> <span>✅ Cleared</span>
+                                <span>Status:</span> <span>✅ All Clear</span>
                             </div>
                         )}
                     </div>
@@ -206,66 +193,70 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* 📜 TABLE: MONTH-WISE SUMMARIZED PASSBOOK */}
+            {/* 📅 NAYA VIP CALENDAR GRID */}
+            {!student.has_active_plan && (
+                <div className="mb-10 bg-white p-6 rounded-3xl shadow-xl border border-gray-100">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b pb-2 flex justify-between items-center">
+                        📅 {currentYear} Payment Calendar
+                        <span className="text-[9px] text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full font-black border border-indigo-100">Auto-Tracking Active</span>
+                    </h3>
+                    
+                    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {calendarGrid.map((c, idx) => (
+                            <div key={idx} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${
+                                c.status === 'paid' ? 'bg-green-50 border-green-500 text-green-700 shadow-sm' :
+                                c.status === 'due_current' ? 'bg-orange-50 border-orange-500 text-orange-600 shadow-md animate-pulse' :
+                                c.status === 'due_past' ? 'bg-red-50 border-red-500 text-red-600 shadow-md' :
+                                'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
+                            }`}>
+                                <span className="text-xl font-black">{c.shortMonth}</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest">
+                                    {c.status === 'paid' ? '✅ Paid' : c.status === 'due_current' ? '⚠️ Due Now' : c.status === 'due_past' ? '❌ Defaulter' : 'Upcoming'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 📜 TRANSACTION PASSBOOK (Sirf Paid entries dikhayega) */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
-            <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-700'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
-                {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} RECORD` : '📜 MONTHLY STATEMENT PASSBOOK'}
+            <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-slate-800'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
+                {student.has_active_plan ? `📦 ACTIVE ${config.planLabel.toUpperCase()} PURCHASE RECORD` : '📜 DETAILED PAYMENT RECEIPTS'}
             </div>
             <table className="w-full text-center border-collapse">
-                <thead className="bg-slate-100 text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
                 <tr>
-                    <th className="p-4 border-b text-left pl-6">Month</th>
-                    <th className="p-4 border-b text-center">Total Fees</th>
-                    <th className="p-4 border-b text-center">Amount Paid</th>
-                    <th className="p-4 border-b text-right pr-6">Balance Status</th>
+                    <th className="p-4 border-b text-left pl-6">Paid On Date</th>
+                    <th className="p-4 border-b text-left">Description & Covered Month</th>
+                    <th className="p-4 border-b text-green-500 text-right pr-6">Amount Received</th>
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                {student.has_active_plan ? (
-                     paymentHistory.length > 0 ? paymentHistory.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                            <td className="p-4 font-black text-indigo-900 text-xs text-left pl-6">{item.plan_name} <br/><span className="text-[9px] text-slate-400">{item.start_date}</span></td>
-                            <td className="p-4 font-bold text-slate-600 text-sm">₹{item.price}</td>
-                            <td className="p-4 font-black text-green-600 text-sm">₹{item.price}</td>
-                            <td className="p-4 font-black text-xs text-right pr-6"><span className="bg-green-100 text-green-700 px-2 py-1 rounded">✅ Paid</span></td>
-                        </tr>
-                     )) : <tr><td colSpan="4" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
-                ) : (
-                    // 🚀 NAYA JAADOO: Ab purane mahine ka billed amount change nahi hoga!
-                    monthlyPassbook.length > 0 ? monthlyPassbook.map((row, idx) => {
-                        const balance = row.billed - row.paid; 
-                        
-                        return (
-                        <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                            <td className="p-4 font-black text-indigo-900 uppercase text-xs text-left pl-6">
-                                🗓️ {row.monthName}
-                            </td>
-                            <td className="p-4 font-bold text-slate-600 text-sm">
-                                ₹{row.billed}
-                            </td>
-                            <td className="p-4 font-black text-green-600 text-sm bg-green-50/20">
-                                ₹{row.paid}
-                            </td>
-                            <td className="p-4 text-right pr-6">
-                                {balance > 0 ? (
-                                    <span className="text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 shadow-sm text-xs font-black">
-                                        ⚠️ Due: ₹{balance}
-                                    </span>
-                                ) : balance < 0 ? (
-                                    <span className="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm text-xs font-black">
-                                        ⭐ Adv: ₹{Math.abs(balance)}
-                                    </span>
-                                ) : (
-                                    <span className="text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 shadow-sm text-xs font-black">
-                                        ✅ Cleared
-                                    </span>
-                                )}
-                            </td>
-                        </tr>
-                        );
-                    }) : (
-                        <tr><td colSpan="4" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No passbook history found.</td></tr>
-                    )
+                {paymentHistory.filter(item => item.status === 'Paid').length > 0 ? paymentHistory.filter(item => item.status === 'Paid').map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
+                    
+                    <td className="p-4 font-bold text-slate-500 uppercase text-xs text-left pl-6">
+                        {item.start_date || (item.paid_on ? new Date(item.paid_on).toLocaleDateString('en-IN') : 'N/A')}
+                    </td>
+                    
+                    <td className="p-4 text-xs font-black text-slate-700 text-left">
+                        {item.plan_name || item.description || 'Fees Payment'}
+                        <br/>
+                        {item.month && (
+                            <span className="text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block border border-indigo-100 font-black uppercase">
+                                🗓️ Paid For: {item.month}
+                            </span>
+                        )}
+                    </td>
+
+                    <td className="p-4 font-black text-green-600 text-lg text-right pr-6">
+                        +₹{item.amount || item.price}
+                    </td>
+
+                    </tr>
+                )) : (
+                    <tr><td colSpan="3" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No payment history found.</td></tr>
                 )}
                 </tbody>
             </table>
@@ -329,11 +320,11 @@ function StudentProfile() {
             </tbody>
         </table>
 
-        {!student.has_active_plan && Number(student.due_fees) > 0 && (
+        {!student.has_active_plan && dueMonthsCount > 0 && (
             <div className="flex justify-end mb-8">
                <div className="border-2 border-gray-800 p-3 w-64 flex justify-between bg-gray-100">
                   <span className="font-black uppercase text-xs tracking-widest">Total Due Balance:</span>
-                  <span className="font-black text-xl">₹{student.due_fees}</span>
+                  <span className="font-black text-xl">₹{autoCalculatedDue}</span>
                </div>
             </div>
         )}
