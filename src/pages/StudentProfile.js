@@ -58,7 +58,7 @@ function StudentProfile() {
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
   // =================================================================
-  // 🧠 AUTOMATIC DYNAMIC MONTH-WISE LEDGER (Anchor Supported)
+  // 🧠 THE MASTERPIECE: TRANSPARENT DYNAMIC LEDGER
   // =================================================================
   
   const baseFee = Number(student.total_fees || 0);
@@ -71,12 +71,12 @@ function StudentProfile() {
 
   if (!student.has_active_plan) {
       const monthPayments = {};
-      const allKnownMonths = new Set(); // Yahan Billed aur Paid dono mahine ikkathe honge
+      const allKnownMonths = new Set(); 
       
       paymentHistory.forEach(p => {
           if (p.month) {
               const mArr = p.month.split(',').map(m => m.trim());
-              mArr.forEach(m => allKnownMonths.add(m)); // Anchor record karta hai
+              mArr.forEach(m => allKnownMonths.add(m)); 
               
               if (p.status === 'Paid' && p.amount) {
                   const splitAmt = Number(p.amount) / mArr.length;
@@ -87,7 +87,6 @@ function StudentProfile() {
           }
       });
 
-      // 🚀 THE FIX: Start Month ab strictly sabse pehle record se uthega (Anchor se)
       const sortedKnownMonths = Array.from(allKnownMonths).sort((a,b) => new Date(a) - new Date(b));
       const currentMonthDate = new Date();
       const currentMonthStr = currentMonthDate.toLocaleString('default', { month: 'short', year: 'numeric' });
@@ -117,38 +116,46 @@ function StudentProfile() {
           const paidThisMonth = monthPayments[m] || 0;
           totalPaidLifetime += paidThisMonth;
 
-          const totalAvailable = paidThisMonth + carryOver;
+          const incomingCarry = carryOver; // 🚀 NAYA: Pichle mahine se kya aaya
+          const totalAvailable = paidThisMonth + incomingCarry;
           const balance = totalAvailable - baseFee;
 
-          let due = 0;
-          let advance = 0;
+          let finalStatus = '';
+          let statusColor = '';
 
           if (balance < 0) {
-              due = Math.abs(balance);
+              finalStatus = `⚠️ Due: ₹${Math.abs(balance)}`;
+              statusColor = 'text-red-500';
+              carryOver = balance; 
+          } else if (balance > 0) {
+              finalStatus = `⭐ Adv: ₹${balance}`;
+              statusColor = 'text-blue-500';
               carryOver = balance; 
           } else {
-              advance = balance;
-              carryOver = balance; 
+              finalStatus = `✅ Cleared`;
+              statusColor = 'text-green-500';
+              carryOver = 0;
           }
 
           ledger.push({
               month: m,
               base: baseFee,
               paid: paidThisMonth,
-              due: due,
-              advance: advance,
+              incomingCarry: incomingCarry,
+              finalStatus: finalStatus,
+              statusColor: statusColor,
               netBalance: carryOver
           });
       });
 
       ledger.reverse(); 
 
-      currentMonthSummary = ledger.find(l => l.month === currentMonthStr) || { base: baseFee, paid: 0, due: baseFee, advance: 0, netBalance: -baseFee };
+      currentMonthSummary = ledger.find(l => l.month === currentMonthStr) || { base: baseFee, paid: 0, incomingCarry: 0, netBalance: -baseFee };
       const currentIndex = ledger.findIndex(l => l.month === currentMonthStr);
       
       previousMonthSummary = currentIndex !== -1 && ledger[currentIndex + 1] 
                              ? ledger[currentIndex + 1] 
-                             : { due: 0, advance: 0, netBalance: 0 };
+                             : { netBalance: 0 };
       
       totalDueOverall = currentMonthSummary.netBalance < 0 ? Math.abs(currentMonthSummary.netBalance) : 0;
 
@@ -205,16 +212,16 @@ function StudentProfile() {
                             
                             <div className="space-y-2 text-sm font-bold">
                                 <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
-                                    <span className="text-slate-400 text-[10px] tracking-widest uppercase">Current Month Base Fees:</span> 
+                                    <span className="text-slate-400 text-[10px] tracking-widest uppercase">Base Month Fee:</span> 
                                     <span className="text-lg">₹{currentMonthSummary.base}</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
-                                    <span className="text-slate-400 text-[10px] tracking-widest uppercase">Current Month Paid Fees:</span> 
+                                    <span className="text-slate-400 text-[10px] tracking-widest uppercase">Paid in Current Mth:</span> 
                                     <span className="text-green-400 text-lg">₹{currentMonthSummary.paid}</span>
                                 </div>
                                 
                                 <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg border-l-4 border-amber-400">
-                                    <span className="text-amber-200 text-[10px] tracking-widest uppercase">Prev Month {previousMonthSummary.netBalance < 0 ? 'Due' : 'Advance'}:</span> 
+                                    <span className="text-amber-200 text-[10px] tracking-widest uppercase">Prev Mth {previousMonthSummary.netBalance < 0 ? 'Due' : 'Advance'}:</span> 
                                     <span className={previousMonthSummary.netBalance < 0 ? 'text-red-400' : 'text-blue-400'}>
                                         ₹{Math.abs(previousMonthSummary.netBalance)}
                                     </span>
@@ -225,7 +232,7 @@ function StudentProfile() {
                         <div className="mt-4 pt-4 border-t border-white/20">
                             <div className="flex justify-between items-end">
                                 <div>
-                                    <p className="text-[10px] uppercase text-slate-400 tracking-widest mb-1">Total Due</p>
+                                    <p className="text-[10px] uppercase text-slate-400 tracking-widest mb-1">Total Due Now</p>
                                     <p className={`text-3xl font-black ${totalDueOverall > 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>
                                         ₹{totalDueOverall}
                                     </p>
@@ -240,7 +247,7 @@ function StudentProfile() {
                 )}
             </div>
 
-            {/* 📜 MONTH-WISE SEPARATE TABLE */}
+            {/* 📜 MONTH-WISE SEPARATE TABLE (Advance Fixed) */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className="bg-indigo-700 p-4 text-white font-black uppercase tracking-widest text-center text-sm">
                 📜 MONTH-WISE FEES SEPARATION LEDGER
@@ -251,15 +258,17 @@ function StudentProfile() {
                     <tr>
                         <th className="p-4 border-b text-left pl-6">Month of Fees</th>
                         <th className="p-4 border-b text-center text-slate-600">Base Fees</th>
-                        <th className="p-4 border-b text-center text-green-600">Paid Fees</th>
-                        <th className="p-4 border-b text-center text-blue-600">Advance Fees</th>
-                        <th className="p-4 border-b text-center text-red-500">Due Fees</th>
-                        <th className="p-4 border-b text-right pr-6">Fees Receipt</th>
+                        <th className="p-4 border-b text-center text-green-600">Paid Direct</th>
+                        
+                        {/* 🚀 NAYA COLUMN: Pura Hisaab dikhayega */}
+                        <th className="p-4 border-b text-center text-amber-600">Pichla Hisaab (Adj)</th>
+                        
+                        <th className="p-4 border-b text-right pr-6">Month Status</th>
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                     {student.has_active_plan ? (
-                        <tr><td colSpan="6" className="p-10 font-bold text-slate-400">PRO Plan Active - Refer to Dashboard.</td></tr>
+                        <tr><td colSpan="5" className="p-10 font-bold text-slate-400">PRO Plan Active - Refer to Dashboard.</td></tr>
                     ) : (
                         ledger.length > 0 ? ledger.map((row, idx) => (
                             <tr key={idx} className="hover:bg-indigo-50/30 transition-all border-b">
@@ -274,21 +283,17 @@ function StudentProfile() {
                                 
                                 <td className="p-4 font-black text-green-600 text-sm">₹{row.paid}</td>
                                 
-                                <td className="p-4 font-black text-blue-500 text-sm">{row.advance > 0 ? `+₹${row.advance}` : '-'}</td>
+                                {/* 🚀 FIX: Yahan exactly pata chalega ki advance apply hua hai */}
+                                <td className="p-4 font-black text-amber-500 text-xs">
+                                    {row.incomingCarry > 0 ? `+₹${row.incomingCarry} (Adv)` : row.incomingCarry < 0 ? `-₹${Math.abs(row.incomingCarry)} (Due)` : '₹0'}
+                                </td>
                                 
-                                <td className="p-4 font-black text-red-500 text-sm">{row.due > 0 ? `⚠️ ₹${row.due}` : '-'}</td>
-
-                                <td className="p-4 text-right pr-6">
-                                    <button 
-                                        onClick={() => handlePrint(row)} 
-                                        className="bg-slate-800 hover:bg-black text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
-                                    >
-                                        🖨️ Receipt
-                                    </button>
+                                <td className={`p-4 text-right pr-6 font-black text-sm ${row.statusColor}`}>
+                                    {row.finalStatus}
                                 </td>
 
                             </tr>
-                        )) : <tr><td colSpan="6" className="p-10 text-slate-300 font-black italic uppercase text-xs">No records found.</td></tr>
+                        )) : <tr><td colSpan="5" className="p-10 text-slate-300 font-black italic uppercase text-xs">No records found.</td></tr>
                     )}
                     </tbody>
                 </table>
@@ -297,86 +302,6 @@ function StudentProfile() {
 
         </div>
       </div>
-
-      {/* 🖨️ SPECIFIC MONTH PRINT VIEW */}
-      {printMonthData && (
-      <div className="hidden print:block w-full max-w-3xl mx-auto bg-white text-black p-8 border-2 border-gray-800 outline-2 outline-offset-4 outline-black">
-        <div className="flex justify-between items-end border-b-4 border-gray-800 pb-6 mb-6">
-            <div>
-               <h1 className="text-5xl font-black uppercase tracking-tighter text-black">{config.appName}</h1>
-               <p className="font-bold text-gray-600 uppercase tracking-widest mt-1 text-sm">{config.branchName}</p>
-            </div>
-            <div className="text-right">
-               <h2 className="text-3xl font-black uppercase text-gray-300 tracking-widest">FEE RECEIPT</h2>
-               <p className="font-bold text-gray-800 mt-2 text-sm">Receipt No: #{config.receiptPrefix}-{student.id}-{Math.floor(Math.random() * 900) + 100}</p>
-               <p className="font-bold text-gray-800 text-sm">Date: {new Date().toLocaleDateString('en-IN')}</p>
-            </div>
-        </div>
-
-        <div className="mb-8 flex justify-between">
-            <div>
-               <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Received From:</p>
-               <h3 className="text-2xl font-black uppercase text-black">{student.name}</h3>
-               <p className="font-bold text-gray-800">Phone: {student.mobile || student.whatsapp || 'N/A'}</p>
-               <p className="font-bold text-gray-800">ID: #{config.receiptPrefix}-{student.id}</p>
-            </div>
-            <div className="text-right">
-                <span className="border-2 border-black text-black text-xs px-3 py-1 font-black uppercase tracking-widest">
-                    Billing Month: {printMonthData.month}
-                </span>
-            </div>
-        </div>
-        
-        <table className="w-full border-collapse border-2 border-gray-800 mb-8">
-            <thead className="bg-gray-100">
-                <tr>
-                    <th className="border-2 border-gray-800 p-4 text-left font-black uppercase tracking-widest text-xs">Description</th>
-                    <th className="border-2 border-gray-800 p-4 text-center font-black uppercase tracking-widest text-xs">Base Fee</th>
-                    <th className="border-2 border-gray-800 p-4 text-right font-black uppercase tracking-widest text-xs">Amount Paid</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td className="border-2 border-gray-800 p-4 font-bold text-sm uppercase">
-                        Fees Payment for Month of {printMonthData.month}
-                    </td>
-                    <td className="border-2 border-gray-800 p-4 text-center font-bold text-sm uppercase">
-                         ₹{printMonthData.base}
-                    </td>
-                    <td className="border-2 border-gray-800 p-4 text-right font-black text-xl">
-                        ₹{printMonthData.paid}
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div className="flex justify-end mb-8 gap-4">
-           {printMonthData.advance > 0 && (
-               <div className="border-2 border-gray-800 p-3 w-48 flex justify-between bg-gray-100">
-                  <span className="font-black uppercase text-xs tracking-widest">Advance:</span>
-                  <span className="font-black text-lg">₹{printMonthData.advance}</span>
-               </div>
-           )}
-           {printMonthData.due > 0 && (
-               <div className="border-2 border-gray-800 p-3 w-48 flex justify-between bg-gray-100">
-                  <span className="font-black uppercase text-xs tracking-widest">Due Balance:</span>
-                  <span className="font-black text-lg">₹{printMonthData.due}</span>
-               </div>
-           )}
-        </div>
-
-        <div className="mt-16 pt-8 border-t-2 border-dashed border-gray-400 flex justify-between items-end">
-            <div>
-               <p className="font-black text-xl italic text-gray-800">Thank You!</p>
-               <p className="text-xs font-bold text-gray-500 mt-1 uppercase">Computer Generated Receipt</p>
-            </div>
-            <div className="text-center">
-               <div className="border-b-2 border-gray-800 w-48 mb-2"></div>
-               <p className="font-black uppercase tracking-widest text-xs text-gray-600">Authorized Signature</p>
-            </div>
-        </div>
-      </div>
-      )}
     </div>
   );
 }
