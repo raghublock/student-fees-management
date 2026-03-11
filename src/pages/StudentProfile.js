@@ -9,6 +9,8 @@ function StudentProfile() {
   const [student, setStudent] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
   
+  const [printMonthData, setPrintMonthData] = useState(null);
+  
   const API_URL = config.apiUrl; 
   const token = localStorage.getItem('adminToken');
 
@@ -60,7 +62,6 @@ function StudentProfile() {
             ? new Date(latestPayment.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
             : 'N/A';
       } else {
-          // Find last cash payment date
           const lastCash = paymentHistory.find(p => p.status === 'Paid' && p.mode !== 'Discount');
           if (lastCash && lastCash.month) {
               const monthsArr = lastCash.month.split(',').map(m => m.trim());
@@ -74,7 +75,7 @@ function StudentProfile() {
   const discountAmt = Number(student.extra_fees) || 0;
   const liveDue = Number(student.total_fees) - Number(student.paid_fees) - discountAmt;
 
-  // 📊 MONTH-WISE PASSBOOK ALGORITHM
+  // 📊 THE ULTIMATE PASSBOOK ALGORITHM (With Carry Forward)
   const ledgerMap = {};
   let totalBilledInHistory = 0; 
 
@@ -102,14 +103,29 @@ function StudentProfile() {
       });
   }
 
-  const monthlyPassbook = Object.values(ledgerMap).sort((a, b) => new Date(b.monthName) - new Date(a.monthName));
+  // Pehle Oldest se Newest sort karenge taaki carry forward sahi se chale
+  let monthlyPassbook = Object.values(ledgerMap).sort((a, b) => new Date(a.monthName) - new Date(b.monthName));
 
+  // Purana Billed Data add karo sabse pehle mahine mein (Agar history miss ho)
   if (!student.has_active_plan && monthlyPassbook.length > 0) {
       const missingBilled = Number(student.total_fees) - totalBilledInHistory;
       if (missingBilled > 0) {
-          monthlyPassbook[monthlyPassbook.length - 1].billed += missingBilled;
+          monthlyPassbook[0].billed += missingBilled; 
       }
   }
+
+  // 🚀 RUNNING BALANCE ENGINE (Carry Forward Advance/Due to next month)
+  let runningBalance = 0;
+  monthlyPassbook.forEach(row => {
+      const requiredThisMonth = row.billed - row.discount;
+      const availableThisMonth = row.paid + runningBalance; // Pichle mahine ka paisa naye mein add ho gaya!
+      
+      row.balance = availableThisMonth - requiredThisMonth; 
+      runningBalance = row.balance; // Agle mahine ke liye save kar lo
+  });
+
+  // Rendering ke liye table ko wapas palat do (Naya mahina upar)
+  monthlyPassbook.reverse();
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen font-sans">
@@ -209,7 +225,7 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* 📜 TABLE: PASSBOOK (With Discount Column) */}
+            {/* 📜 TABLE: PASSBOOK (With Fixed Carry-Forward Engine) */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-700'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
                 📜 STATEMENT PASSBOOK
@@ -237,7 +253,7 @@ function StudentProfile() {
                      )) : <tr><td colSpan="5" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
                 ) : (
                     monthlyPassbook.length > 0 ? monthlyPassbook.map((row, idx) => {
-                        const balance = row.billed - row.paid - row.discount; 
+                        const balance = row.balance; 
                         
                         return (
                         <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
@@ -254,13 +270,13 @@ function StudentProfile() {
                                 ₹{row.paid}
                             </td>
                             <td className="p-4 text-right pr-6">
-                                {balance > 0 ? (
+                                {balance < 0 ? (
                                     <span className="text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 shadow-sm text-xs font-black">
-                                        ⚠️ Due: ₹{balance}
+                                        ⚠️ Due: ₹{Math.abs(balance)}
                                     </span>
-                                ) : balance < 0 ? (
+                                ) : balance > 0 ? (
                                     <span className="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm text-xs font-black">
-                                        ⭐ Adv: ₹{Math.abs(balance)}
+                                        ⭐ Adv: ₹{balance}
                                     </span>
                                 ) : (
                                     <span className="text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 shadow-sm text-xs font-black">
