@@ -72,6 +72,10 @@ function StudentProfile() {
       }
   }
 
+  // 🚀 NAYA JADOO: LIVE MATH ENGINE (Ab DB ke galat due par bharosa nahi)
+  const discountAmt = Number(student.extra_fees) || 0;
+  const liveDue = Number(student.total_fees) - Number(student.paid_fees) - discountAmt;
+
   // 📊 PURANA MONTH-WISE LOGIC (Flawless Math Fix ke sath)
   const ledgerMap = {};
   let totalBilledInHistory = 0; 
@@ -98,7 +102,6 @@ function StudentProfile() {
 
   const monthlyPassbook = Object.values(ledgerMap).sort((a, b) => new Date(b.monthName) - new Date(a.monthName));
 
-  // Purana Initial Balance Fix
   if (!student.has_active_plan && monthlyPassbook.length > 0) {
       const missingBilled = Number(student.total_fees) - totalBilledInHistory;
       if (missingBilled > 0) {
@@ -142,7 +145,7 @@ function StudentProfile() {
 
                 <div className="pt-5">
                 <a 
-                    href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(Number(student.due_fees) > 0 ? `Namaste ${student.name}, Aapki fees ₹${student.due_fees} due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka account clear hai. Thank you!`)}`} 
+                    href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(liveDue > 0 ? `Namaste ${student.name}, Aapki fees ₹${liveDue} due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka account clear hai. Thank you!`)}`} 
                     target="_blank" rel="noreferrer"
                     className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2.5 rounded-xl font-black shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all uppercase tracking-widest text-xs"
                 >
@@ -168,23 +171,22 @@ function StudentProfile() {
                         <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.paid_fees}</span>
                     </div>
 
-                    {/* 🚀 NAYA: Discount Display */}
-                    {!student.has_active_plan && student.extra_fees > 0 && (
+                    {!student.has_active_plan && discountAmt > 0 && (
                     <div className="flex justify-between text-amber-400 text-xs">
                         <span>Monthly Discount:</span> 
-                        <span>- ₹{student.extra_fees}</span>
+                        <span>- ₹{discountAmt}</span>
                     </div>
                     )}
                     
                     {!student.has_active_plan && (
                     <div className="pt-2 mt-2 border-t border-white/20">
-                        {Number(student.due_fees) > 0 ? (
+                        {liveDue > 0 ? (
                             <div className="flex justify-between text-red-400 text-xl font-black italic underline">
-                                <span>Total Due:</span> <span>₹{student.due_fees}</span>
+                                <span>Total Due:</span> <span>₹{liveDue}</span>
                             </div>
-                        ) : Number(student.due_fees) < 0 ? (
+                        ) : liveDue < 0 ? (
                             <div className="flex justify-between text-blue-400 text-xl font-black italic underline">
-                                <span>Advance:</span> <span>₹{Math.abs(student.due_fees)}</span>
+                                <span>Advance:</span> <span>₹{Math.abs(liveDue)}</span>
                             </div>
                         ) : (
                             <div className="flex justify-between text-green-400 text-lg font-black italic">
@@ -205,7 +207,7 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* 📜 TABLE: PURANA PASSBOOK */}
+            {/* 📜 TABLE: PURANA PASSBOOK WITH DISCOUNT FIX */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-700'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
                 📜 STATEMENT PASSBOOK
@@ -231,7 +233,10 @@ function StudentProfile() {
                      )) : <tr><td colSpan="4" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
                 ) : (
                     monthlyPassbook.length > 0 ? monthlyPassbook.map((row, idx) => {
-                        const balance = row.billed - row.paid; 
+                        // 🚀 NAYA JADOO: First month ke balance mein discount minus karke dikhayega!
+                        const isFirstMonth = idx === monthlyPassbook.length - 1;
+                        const effectiveBilled = isFirstMonth ? (row.billed - discountAmt) : row.billed;
+                        const balance = effectiveBilled - row.paid; 
                         
                         return (
                         <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
@@ -317,11 +322,11 @@ function StudentProfile() {
             </tbody>
         </table>
 
-        {!student.has_active_plan && Number(student.due_fees) > 0 && (
+        {!student.has_active_plan && liveDue > 0 && (
             <div className="flex justify-end mb-8">
                <div className="border-2 border-gray-800 p-3 w-64 flex justify-between bg-gray-100">
                   <span className="font-black uppercase text-xs tracking-widest">Total Due Balance:</span>
-                  <span className="font-black text-xl">₹{student.due_fees}</span>
+                  <span className="font-black text-xl">₹{liveDue}</span>
                </div>
             </div>
         )}
