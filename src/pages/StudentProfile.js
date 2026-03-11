@@ -10,294 +10,338 @@ function StudentProfile() {
   const [paymentHistory, setPaymentHistory] = useState([]);
   
   const [printMonthData, setPrintMonthData] = useState(null);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payDiscount, setPayDiscount] = useState('');
+  const [payMode, setPayMode] = useState('Cash');
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const API_URL = config.apiUrl; 
   const token = localStorage.getItem('adminToken');
 
-  useEffect(() => {
-    if (!token) return navigate('/');
-    
-    fetch(`${API_URL}/api/students`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+  const loadProfileData = () => {
+    fetch(`${API_URL}/api/students`, { headers: { 'Authorization': `Bearer ${token}` } })
     .then(res => res.json())
     .then(data => {
       if (Array.isArray(data)) {
         const foundStudent = data.find(s => Number(s.id) === Number(id));
         setStudent(foundStudent);
-
         if (foundStudent) {
-          const targetEndpoint = foundStudent.has_active_plan 
-            ? `${API_URL}/api/plans/history` 
-            : `${API_URL}/api/fees/history`;
-
-          fetch(targetEndpoint, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
+          const targetEndpoint = foundStudent.has_active_plan ? `${API_URL}/api/plans/history` : `${API_URL}/api/fees/history`;
+          fetch(targetEndpoint, { headers: { 'Authorization': `Bearer ${token}` } })
           .then(res => res.json())
           .then(historyData => {
             if (Array.isArray(historyData)) {
               const filtered = historyData.filter(item => Number(item.student_id) === Number(id));
               setPaymentHistory(filtered);
             }
-          })
-          .catch(() => toast.error("History load nahi hui"));
+          });
         }
       }
-    })
-    .catch(() => toast.error("Profile load nahi hui"));
+    });
+  };
+
+  useEffect(() => {
+    if (!token) return navigate('/');
+    loadProfileData();
+    // eslint-disable-next-line
   }, [id, token, navigate]);
 
-  const handlePrint = () => { window.print(); };
+  const handleAddNewPayment = async (e) => {
+      e.preventDefault();
+      const amt = Number(payAmount) || 0;
+      const disc = Number(payDiscount) || 0;
+      if (amt <= 0 && disc <= 0) return toast.error("Amount daalein!");
+
+      setIsProcessing(true);
+      const tid = toast.loading("Entry save ho rahi hai...");
+
+      try {
+          if (amt > 0) {
+              await fetch(`${API_URL}/api/fees/add`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                  body: JSON.stringify({ student_id: student.id, amount: amt, paid_on: new Date().toISOString().split('T')[0], mode: payMode, description: `Cycle Payment`, status: "Paid", month: "Extension" })
+              });
+          }
+          if (disc > 0) {
+              await fetch(`${API_URL}/api/fees/add`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                  body: JSON.stringify({ student_id: student.id, amount: disc, paid_on: new Date().toISOString().split('T')[0], mode: 'Discount', description: `Cycle Discount`, status: "Paid", month: "Extension" })
+              });
+          }
+
+          const newPaid = Number(student.paid_fees || 0) + amt;
+          const newDisc = Number(student.extra_fees || 0) + disc;
+          await fetch(`${API_URL}/api/student/update/${student.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ ...student, paid_fees: newPaid, extra_fees: newDisc })
+          });
+
+          toast.success(`Entry Successful! 🎉`, { id: tid });
+          setShowPayModal(false); setPayAmount(''); setPayDiscount('');
+          loadProfileData();
+      } catch (error) { toast.error("Entry fail ho gayi.", { id: tid }); } 
+      finally { setIsProcessing(false); }
+  };
+
+  const handlePrint = (monthData) => { 
+      setPrintMonthData(monthData);
+      setTimeout(() => window.print(), 100);
+  };
 
   if (!student) return <div className="p-10 text-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">{config.appName} | Profile Loading...</div>;
 
-  let expiryDisplay = 'N/A';
-  let latestPayment = null;
+  // =================================================================
+  // 🧠 DATE-TO-DATE CYCLE ENGINE (No more manual month names!)
+  // =================================================================
   
-  if (paymentHistory.length > 0) {
-      latestPayment = paymentHistory[0]; 
-      if (student.has_active_plan) {
-          expiryDisplay = latestPayment.expiry_date 
-            ? new Date(latestPayment.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
-            : 'N/A';
-      } else {
-          const lastCash = paymentHistory.find(p => p.status === 'Paid' && p.mode !== 'Discount');
-          if (lastCash && lastCash.month) {
-              const monthsArr = lastCash.month.split(',').map(m => m.trim());
-              const lastMonth = monthsArr[monthsArr.length - 1]; 
-              expiryDisplay = `End of ${lastMonth}`;
-          }
-      }
-  }
-
-  // 🚀 LIVE MATH FIX
-  const discountAmt = Number(student.extra_fees) || 0;
-  const liveDue = Number(student.total_fees) - Number(student.paid_fees) - discountAmt;
-
-  // 📊 THE ULTIMATE PASSBOOK ALGORITHM (With Carry Forward)
-  const ledgerMap = {};
-  let totalBilledInHistory = 0; 
-
+  const baseFee = Number(student.total_fees || 0);
+  let ledger = [];
+  let validTillStr = "N/A";
+  let liveDue = 0;
+  let totalBilledSoFar = 0;
+  let totalPaid = 0;
+  let totalDiscount = 0;
+  
   if (!student.has_active_plan && paymentHistory.length > 0) {
-      paymentHistory.forEach(item => {
-          const mStr = item.month || new Date(item.paid_on).toLocaleString('default', { month: 'short', year: 'numeric' });
-          const monthsArr = mStr.split(',').map(m => m.trim());
-          const amountPerMonth = Number(item.amount || item.price || 0) / monthsArr.length;
-
-          monthsArr.forEach(m => {
-              if (!ledgerMap[m]) {
-                  ledgerMap[m] = { monthName: m, billed: 0, paid: 0, discount: 0 };
-              }
-              if (item.status === 'Billed') {
-                  ledgerMap[m].billed += amountPerMonth;
-                  totalBilledInHistory += amountPerMonth; 
-              } else if (item.status === 'Paid') {
-                  if (item.mode === 'Discount') {
-                      ledgerMap[m].discount += amountPerMonth;
-                  } else {
-                      ledgerMap[m].paid += amountPerMonth;
-                  }
-              }
-          });
-      });
-  }
-
-  // Pehle Oldest se Newest sort karenge taaki carry forward sahi se chale
-  let monthlyPassbook = Object.values(ledgerMap).sort((a, b) => new Date(a.monthName) - new Date(b.monthName));
-
-  // Purana Billed Data add karo sabse pehle mahine mein (Agar history miss ho)
-  if (!student.has_active_plan && monthlyPassbook.length > 0) {
-      const missingBilled = Number(student.total_fees) - totalBilledInHistory;
-      if (missingBilled > 0) {
-          monthlyPassbook[0].billed += missingBilled; 
-      }
-  }
-
-  // 🚀 RUNNING BALANCE ENGINE (Carry Forward Advance/Due to next month)
-  let runningBalance = 0;
-  monthlyPassbook.forEach(row => {
-      const requiredThisMonth = row.billed - row.discount;
-      const availableThisMonth = row.paid + runningBalance; // Pichle mahine ka paisa naye mein add ho gaya!
       
-      row.balance = availableThisMonth - requiredThisMonth; 
-      runningBalance = row.balance; // Agle mahine ke liye save kar lo
-  });
+      // 1. Find Exact Joining Date (From the Anchor)
+      const sortedHistory = [...paymentHistory].sort((a,b) => new Date(a.paid_on) - new Date(b.paid_on));
+      const firstRecordDate = sortedHistory.length > 0 ? sortedHistory[0].paid_on : new Date().toISOString().split('T')[0];
+      const joinD = new Date(firstRecordDate);
 
-  // Rendering ke liye table ko wapas palat do (Naya mahina upar)
-  monthlyPassbook.reverse();
+      // 2. Sum all Paid and Discount money
+      paymentHistory.forEach(p => {
+          if (p.status === 'Paid') {
+              if (p.mode === 'Discount') totalDiscount += Number(p.amount);
+              else totalPaid += Number(p.amount);
+          }
+      });
+      const effectivePaid = totalPaid + totalDiscount;
+
+      // 3. Calculate Valid Till Date (Date to Date)
+      const monthsCovered = Math.floor(effectivePaid / (baseFee || 1));
+      const validTill = new Date(joinD);
+      validTill.setMonth(validTill.getMonth() + monthsCovered);
+      validTillStr = validTill.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+      // 4. Calculate how many Cycles have passed till TODAY
+      const today = new Date();
+      let cyclesPassed = 0;
+      let tempD = new Date(joinD);
+      while(tempD <= today) {
+          cyclesPassed++;
+          tempD.setMonth(tempD.getMonth() + 1);
+      }
+      if (cyclesPassed === 0) cyclesPassed = 1; // At least 1st month bill
+
+      totalBilledSoFar = cyclesPassed * baseFee;
+      liveDue = totalBilledSoFar - effectivePaid;
+
+      // 5. Build Dynamic Ledger Array (Cycle by Cycle)
+      let runningFunds = effectivePaid;
+      const cyclesToShow = Math.max(cyclesPassed, Math.ceil(effectivePaid / (baseFee || 1)));
+
+      for(let i = 0; i < cyclesToShow; i++) {
+          // Cycle Start
+          let cStart = new Date(joinD);
+          cStart.setMonth(cStart.getMonth() + i);
+          
+          // Cycle End (1 day before next month)
+          let cEnd = new Date(cStart);
+          cEnd.setMonth(cEnd.getMonth() + 1);
+          cEnd.setDate(cEnd.getDate() - 1);
+
+          let cycleName = `${cStart.toLocaleDateString('en-IN', {day:'numeric', month:'short'})} to ${cEnd.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'})}`;
+
+          let rowBilled = baseFee;
+          let rowPaid = 0;
+
+          if (runningFunds >= rowBilled) {
+              rowPaid = rowBilled;
+              runningFunds -= rowBilled;
+          } else if (runningFunds > 0) {
+              rowPaid = runningFunds;
+              runningFunds = 0;
+          }
+
+          let rowDue = rowBilled - rowPaid;
+
+          ledger.push({
+              cycle: cycleName,
+              billed: rowBilled,
+              allocated: rowPaid,
+              due: rowDue,
+              status: rowDue === 0 ? '✅ Cleared' : (rowPaid > 0 ? `⚠️ Due: ₹${rowDue}` : `❌ Unpaid`),
+              statusColor: rowDue === 0 ? 'text-green-600' : 'text-red-500'
+          });
+      }
+      ledger.reverse(); // Latest cycle on top
+  } else if (student.has_active_plan && paymentHistory.length > 0) {
+      validTillStr = paymentHistory[0].expiry_date ? new Date(paymentHistory[0].expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+  }
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans">
+    <div className="p-6 bg-slate-50 min-h-screen font-sans relative">
       <div className="print:hidden">
         
-        {/* Header */}
-        <div className="max-w-5xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
-            <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} {config.mainEmoji}</h1>
+        <div className="max-w-6xl mx-auto flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border-b-4 border-indigo-600">
+            <h1 className="text-3xl font-black text-indigo-700 uppercase">{config.appName} 📚</h1>
             <div className="flex gap-3">
-            <button onClick={handlePrint} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-black shadow-md hover:bg-indigo-700 transition active:scale-95">🖨️ Print Receipt</button>
-            <Link to="/dashboard" className="bg-slate-200 text-slate-700 px-5 py-2 rounded-lg font-black hover:bg-slate-300">← Back</Link>
+                <Link to="/dashboard" className="bg-slate-200 text-slate-700 px-5 py-2 rounded-lg font-black hover:bg-slate-300 transition-all">← Back</Link>
             </div>
         </div>
 
-        <div className="max-w-5xl mx-auto">
-            {/* Top Profile Box */}
-            <div className="bg-white p-8 rounded-3xl shadow-xl mb-6 border border-gray-100 flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
-            <img 
-                src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} 
-                alt={config.userType} 
-                className="h-44 w-44 rounded-3xl object-cover border-4 border-indigo-50 shadow-lg"
-            />
-            
-            <div className="flex-1 text-center md:text-left space-y-2">
-                <div className="flex flex-col md:flex-row items-center gap-3 justify-center md:justify-start">
-                <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">{student.name}</h2>
-                </div>
-                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">
-                Account Status: {student.has_active_plan ? `Custom Package` : 'Auto-Bill System'}
-                </p>
-                <div className="pt-4 text-sm font-bold text-slate-600 grid grid-cols-1 md:grid-cols-2 gap-2 uppercase">
-                    <p>📞 {student.mobile || 'N/A'}</p>
-                    <p>🆔 ID: #{config.receiptPrefix}-{student.id}</p>
-                </div>
+        <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                
+                <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col md:flex-row items-center gap-8">
+                    <img src={student.photo_url || student.photo || 'https://via.placeholder.com/150'} alt="Profile" className="h-36 w-36 rounded-3xl object-cover border-4 border-indigo-50 shadow-md" />
+                    <div className="text-center md:text-left space-y-2 w-full">
+                        <div className="flex flex-col md:flex-row items-center gap-4 justify-between w-full">
+                            <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">{student.name}</h2>
+                            
+                            {!student.has_active_plan && (
+                                <button 
+                                    onClick={() => setShowPayModal(true)} 
+                                    className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all uppercase tracking-widest text-xs flex items-center gap-2 border-2 border-indigo-700"
+                                >
+                                    💳 Add Payment Entry
+                                </button>
+                            )}
+                        </div>
+                        
+                        <div className={`inline-block px-4 py-1.5 rounded-md font-black text-xs uppercase tracking-widest shadow-sm ${liveDue > 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+                            {student.has_active_plan ? `Seat Fixed 📦` : (liveDue > 0 ? `⚠️ Dues Pending` : `✅ Active Reader`)}
+                        </div>
 
-                <div className="pt-5">
-                <a 
-                    href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(liveDue > 0 ? `Namaste ${student.name}, Aapki fees ₹${liveDue} due hai. Kripya jama karwayein.` : `Namaste ${student.name}, Aapka account clear hai. Thank you!`)}`} 
-                    target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2.5 rounded-xl font-black shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all uppercase tracking-widest text-xs"
-                >
-                    💬 Send WhatsApp Message
-                </a>
-                </div>
-            </div>
-
-            {/* Smart Financial Box */}
-            <div className={`w-full md:w-80 p-6 rounded-3xl text-white shadow-2xl transition-all duration-500 transform hover:scale-105 ${student.has_active_plan ? 'bg-orange-600 border-t-8 border-yellow-400' : 'bg-slate-900 border-t-8 border-indigo-500'}`}>
-                <h3 className="text-xs font-black mb-4 border-b border-white/20 pb-2 uppercase tracking-widest italic">
-                    Account Financials
-                </h3>
-                <div className="space-y-3 text-sm font-bold">
-                    
-                    <div className="flex justify-between opacity-80">
-                        <span>Lifetime Billed:</span> 
-                        <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.total_fees}</span>
-                    </div>
-                    
-                    <div className="flex justify-between text-green-400">
-                        <span>Lifetime Paid:</span> 
-                        <span>₹{student.has_active_plan ? (latestPayment?.price || '...') : student.paid_fees}</span>
-                    </div>
-
-                    {!student.has_active_plan && discountAmt > 0 && (
-                    <div className="flex justify-between text-amber-400 text-xs">
-                        <span>Total Discounts Given:</span> 
-                        <span>- ₹{discountAmt}</span>
-                    </div>
-                    )}
-                    
-                    {!student.has_active_plan && (
-                    <div className="pt-2 mt-2 border-t border-white/20">
-                        {liveDue > 0 ? (
-                            <div className="flex justify-between text-red-400 text-xl font-black italic underline">
-                                <span>Total Due:</span> <span>₹{liveDue}</span>
-                            </div>
-                        ) : liveDue < 0 ? (
-                            <div className="flex justify-between text-blue-400 text-xl font-black italic underline">
-                                <span>Advance:</span> <span>₹{Math.abs(liveDue)}</span>
-                            </div>
-                        ) : (
-                            <div className="flex justify-between text-green-400 text-lg font-black italic">
-                                <span>Status:</span> <span>✅ Cleared</span>
-                            </div>
-                        )}
-                    </div>
-                    )}
-
-                    <div className="pt-2 mt-2 border-t border-white/20">
-                        <div className="flex justify-between text-yellow-300 text-sm font-black uppercase tracking-wider">
-                            <span>Valid Till:</span> 
-                            <span>{expiryDisplay}</span>
+                        <div className="pt-2 text-sm font-bold text-slate-600 grid grid-cols-1 md:grid-cols-2 gap-2 uppercase">
+                            <p>📞 {student.mobile || 'N/A'}</p>
+                            <p>🆔 ID: #{config.receiptPrefix}-{student.id}</p>
+                        </div>
+                        
+                        <div className="pt-3 border-t mt-3 border-slate-100">
+                            <a href={`https://wa.me/91${student.whatsapp}?text=${encodeURIComponent(liveDue > 0 ? `Namaste ${student.name}, Aapki library fees ₹${liveDue} due hai. Kripya app mein payment clear karein. Thank you!` : `Namaste ${student.name}, Aapka account clear hai. Happy Reading!`)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2 rounded-xl font-black shadow-md hover:bg-green-600 transition-all uppercase tracking-widest text-xs">
+                                💬 Send WhatsApp Reminder
+                            </a>
                         </div>
                     </div>
-
                 </div>
-            </div>
+
+                {!student.has_active_plan && (
+                    <div className="bg-slate-900 p-6 rounded-3xl text-white shadow-2xl border-t-8 border-indigo-500 flex flex-col justify-between">
+                        <div>
+                            <h3 className="text-xs font-black mb-3 border-b border-white/20 pb-2 uppercase tracking-widest text-indigo-300">Financial Summary</h3>
+                            
+                            <div className="space-y-2 text-sm font-bold">
+                                <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
+                                    <span className="text-slate-400 text-[10px] tracking-widest uppercase">Base Fee (Monthly):</span> 
+                                    <span className="text-lg">₹{baseFee}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg border-l-4 border-green-400">
+                                    <span className="text-slate-300 text-[10px] tracking-widest uppercase">Total Cash Paid:</span> 
+                                    <span className="text-green-400 text-lg">₹{totalPaid}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg border-l-4 border-amber-400">
+                                    <span className="text-slate-300 text-[10px] tracking-widest uppercase">Total Discounts:</span> 
+                                    <span className="text-amber-400 text-sm">₹{totalDiscount}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-white/20">
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <p className="text-[10px] uppercase text-slate-400 tracking-widest mb-1">Live Due Now</p>
+                                    <p className={`text-3xl font-black ${liveDue > 0 ? 'text-red-400 animate-pulse' : liveDue < 0 ? 'text-blue-400' : 'text-green-400'}`}>
+                                        {liveDue < 0 ? `Adv: ₹${Math.abs(liveDue)}` : `₹${liveDue}`}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] uppercase text-slate-400 tracking-widest mb-1">Library Validity</p>
+                                    <p className="text-yellow-300 text-[11px] font-black uppercase">{validTillStr}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* 📜 TABLE: PASSBOOK (With Fixed Carry-Forward Engine) */}
+            {/* 📜 NAYA: CYCLE-WISE DYNAMIC LEDGER */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
-            <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-700'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
-                📜 STATEMENT PASSBOOK
+            <div className="bg-indigo-700 p-4 text-white font-black uppercase tracking-widest text-center text-sm flex justify-between items-center">
+                <span>📜 DYNAMIC DATE-TO-DATE CYCLE LEDGER</span>
             </div>
-            <table className="w-full text-center border-collapse">
-                <thead className="bg-slate-100 text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                <tr>
-                    <th className="p-4 border-b text-left pl-6">Month</th>
-                    <th className="p-4 border-b text-center">Billed Fees</th>
-                    <th className="p-4 border-b text-center text-amber-600">Discount</th>
-                    <th className="p-4 border-b text-center text-green-600">Amount Paid</th>
-                    <th className="p-4 border-b text-right pr-6">Balance Status</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                {student.has_active_plan ? (
-                     paymentHistory.length > 0 ? paymentHistory.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                            <td className="p-4 font-black text-indigo-900 text-xs text-left pl-6">{item.plan_name} <br/><span className="text-[9px] text-slate-400">{item.start_date}</span></td>
-                            <td className="p-4 font-bold text-slate-600 text-sm">₹{item.price}</td>
-                            <td className="p-4 font-bold text-amber-500 text-xs">-</td>
-                            <td className="p-4 font-black text-green-600 text-sm">₹{item.price}</td>
-                            <td className="p-4 font-black text-xs text-right pr-6"><span className="bg-green-100 text-green-700 px-2 py-1 rounded">✅ Paid</span></td>
-                        </tr>
-                     )) : <tr><td colSpan="5" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
-                ) : (
-                    monthlyPassbook.length > 0 ? monthlyPassbook.map((row, idx) => {
-                        const balance = row.balance; 
-                        
-                        return (
-                        <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
-                            <td className="p-4 font-black text-indigo-900 uppercase text-xs text-left pl-6">
-                                🗓️ {row.monthName}
-                            </td>
-                            <td className="p-4 font-bold text-slate-600 text-sm">
-                                ₹{row.billed}
-                            </td>
-                            <td className="p-4 font-bold text-amber-500 text-xs">
-                                {row.discount > 0 ? `- ₹${row.discount}` : '-'}
-                            </td>
-                            <td className="p-4 font-black text-green-600 text-sm bg-green-50/20">
-                                ₹{row.paid}
-                            </td>
-                            <td className="p-4 text-right pr-6">
-                                {balance < 0 ? (
-                                    <span className="text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 shadow-sm text-xs font-black">
-                                        ⚠️ Due: ₹{Math.abs(balance)}
+            <div className="overflow-x-auto">
+                <table className="w-full text-center border-collapse">
+                    <thead className="bg-slate-100 text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                    <tr>
+                        <th className="p-4 border-b text-left pl-6">Reading Cycle</th>
+                        <th className="p-4 border-b text-center text-slate-600">Cycle Base Fee</th>
+                        <th className="p-4 border-b text-center text-green-600">Allocated Amount</th>
+                        <th className="p-4 border-b text-right pr-6">Cycle Status</th>
+                    </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                    {student.has_active_plan ? (
+                        <tr><td colSpan="4" className="p-10 font-bold text-slate-400">PRO Plan Active. Custom validity applied.</td></tr>
+                    ) : (
+                        ledger.length > 0 ? ledger.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-indigo-50/30 transition-all border-b">
+                                
+                                <td className="p-4 text-left pl-6">
+                                    <span className="font-black text-indigo-900 uppercase text-xs bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 flex items-center justify-between gap-4 w-max">
+                                        🗓️ {row.cycle}
+                                        <button onClick={() => handlePrint(row)} className="text-indigo-500 hover:text-indigo-800 transition-colors" title="Print Receipt">🖨️</button>
                                     </span>
-                                ) : balance > 0 ? (
-                                    <span className="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm text-xs font-black">
-                                        ⭐ Adv: ₹{balance}
-                                    </span>
-                                ) : (
-                                    <span className="text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 shadow-sm text-xs font-black">
-                                        ✅ Cleared
-                                    </span>
-                                )}
-                            </td>
-                        </tr>
-                        );
-                    }) : (
-                        <tr><td colSpan="5" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No passbook history found.</td></tr>
-                    )
-                )}
-                </tbody>
-            </table>
+                                </td>
+                                
+                                <td className="p-4 font-bold text-slate-600 text-sm">₹{row.billed}</td>
+                                
+                                <td className="p-4 font-black text-green-600 text-sm">₹{row.allocated}</td>
+                                
+                                <td className={`p-4 text-right pr-6 font-black text-sm ${row.statusColor}`}>
+                                    {row.status}
+                                </td>
+
+                            </tr>
+                        )) : <tr><td colSpan="4" className="p-10 text-slate-300 font-black italic uppercase text-xs">Koi reading record nahi mila.</td></tr>
+                    )}
+                    </tbody>
+                </table>
+            </div>
             </div>
 
         </div>
       </div>
 
-      {/* 🖨️ PRINT VIEW */}
+      {showPayModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all border-t-8 border-indigo-600">
+            <h3 className="text-xl font-black uppercase text-center mb-1 text-indigo-700">💳 Record Payment</h3>
+            <p className="text-center text-xs font-bold text-slate-400 mb-6">Payment from <span className="text-slate-800">{student.name}</span></p>
+            
+            <form onSubmit={handleAddNewPayment} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pay Amount (₹)</label><input type="number" className="w-full border-2 border-slate-200 p-3 rounded-xl outline-none font-black text-2xl focus:border-indigo-500 text-indigo-700 text-center" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} required autoFocus /></div>
+                <div><label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Discount (₹)</label><input type="number" className="w-full border-2 border-amber-200 p-3 rounded-xl outline-none font-black text-lg focus:border-amber-500 text-amber-600 bg-amber-50" value={payDiscount} onChange={(e) => setPayDiscount(e.target.value)} placeholder="e.g. 50" /></div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mode</label><select className="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-slate-500 outline-none font-bold text-slate-700 h-[52px]" value={payMode} onChange={(e) => setPayMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Card</option></select></div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => { setShowPayModal(false); setPayAmount(''); setPayDiscount(''); }} className="flex-1 bg-slate-100 text-slate-500 font-black py-3 rounded-xl">Cancel</button>
+                <button type="submit" disabled={isProcessing} className={`flex-1 text-white font-black py-3 rounded-xl shadow-lg uppercase ${isProcessing ? 'bg-slate-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                    ✅ Save Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {printMonthData && (
       <div className="hidden print:block w-full max-w-3xl mx-auto bg-white text-black p-8 border-2 border-gray-800 outline-2 outline-offset-4 outline-black">
         <div className="flex justify-between items-end border-b-4 border-gray-800 pb-6 mb-6">
             <div>
@@ -305,17 +349,22 @@ function StudentProfile() {
                <p className="font-bold text-gray-600 uppercase tracking-widest mt-1 text-sm">{config.branchName}</p>
             </div>
             <div className="text-right">
-               <h2 className="text-3xl font-black uppercase text-gray-300 tracking-widest">INVOICE</h2>
+               <h2 className="text-3xl font-black uppercase text-gray-300 tracking-widest">LIBRARY RECEIPT</h2>
                <p className="font-bold text-gray-800 mt-2 text-sm">Receipt No: #{config.receiptPrefix}-{student.id}-{Math.floor(Math.random() * 900) + 100}</p>
                <p className="font-bold text-gray-800 text-sm">Date: {new Date().toLocaleDateString('en-IN')}</p>
             </div>
         </div>
+
         <div className="mb-8 flex justify-between">
             <div>
-               <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Billed To:</p>
+               <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Received From:</p>
                <h3 className="text-2xl font-black uppercase text-black">{student.name}</h3>
                <p className="font-bold text-gray-800">Phone: {student.mobile || student.whatsapp || 'N/A'}</p>
-               <p className="font-bold text-gray-800">ID: #{config.receiptPrefix}-{student.id}</p>
+            </div>
+            <div className="text-right">
+                <span className="border-2 border-black text-black text-xs px-3 py-1 font-black uppercase tracking-widest">
+                    Cycle: {printMonthData.cycle}
+                </span>
             </div>
         </div>
         
@@ -323,44 +372,35 @@ function StudentProfile() {
             <thead className="bg-gray-100">
                 <tr>
                     <th className="border-2 border-gray-800 p-4 text-left font-black uppercase tracking-widest text-xs">Description</th>
-                    <th className="border-2 border-gray-800 p-4 text-center font-black uppercase tracking-widest text-xs">Duration/Validity</th>
-                    <th className="border-2 border-gray-800 p-4 text-right font-black uppercase tracking-widest text-xs">Amount Paid</th>
+                    <th className="border-2 border-gray-800 p-4 text-center font-black uppercase tracking-widest text-xs">Base Fee</th>
+                    <th className="border-2 border-gray-800 p-4 text-right font-black uppercase tracking-widest text-xs">Allocated Amount</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td className="border-2 border-gray-800 p-4 font-bold text-sm uppercase">
-                        {student.has_active_plan ? latestPayment?.plan_name : (latestPayment?.description || 'Monthly Fees Payment')}
+                        Library Cycle Payment
                     </td>
                     <td className="border-2 border-gray-800 p-4 text-center font-bold text-sm uppercase">
-                         {expiryDisplay}
+                         ₹{printMonthData.billed}
                     </td>
                     <td className="border-2 border-gray-800 p-4 text-right font-black text-xl">
-                        ₹{student.has_active_plan ? latestPayment?.price : latestPayment?.amount}
+                        ₹{printMonthData.allocated}
                     </td>
                 </tr>
             </tbody>
         </table>
 
-        {!student.has_active_plan && liveDue > 0 && (
+        {printMonthData.due > 0 && (
             <div className="flex justify-end mb-8">
                <div className="border-2 border-gray-800 p-3 w-64 flex justify-between bg-gray-100">
-                  <span className="font-black uppercase text-xs tracking-widest">Total Due Balance:</span>
-                  <span className="font-black text-xl">₹{liveDue}</span>
+                  <span className="font-black uppercase text-xs tracking-widest">Cycle Due Balance:</span>
+                  <span className="font-black text-xl text-red-600">₹{printMonthData.due}</span>
                </div>
             </div>
         )}
-        <div className="mt-16 pt-8 border-t-2 border-dashed border-gray-400 flex justify-between items-end">
-            <div>
-               <p className="font-black text-xl italic text-gray-800">Thank You!</p>
-               <p className="text-xs font-bold text-gray-500 mt-1 uppercase">Computer Generated Receipt</p>
-            </div>
-            <div className="text-center">
-               <div className="border-b-2 border-gray-800 w-48 mb-2"></div>
-               <p className="font-black uppercase tracking-widest text-xs text-gray-600">Authorized Signature</p>
-            </div>
-        </div>
       </div>
+      )}
     </div>
   );
 }
