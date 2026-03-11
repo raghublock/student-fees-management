@@ -60,23 +60,21 @@ function StudentProfile() {
             ? new Date(latestPayment.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
             : 'N/A';
       } else {
-          if (latestPayment.month) {
-              const monthsArr = latestPayment.month.split(',').map(m => m.trim());
+          // Find last cash payment date
+          const lastCash = paymentHistory.find(p => p.status === 'Paid' && p.mode !== 'Discount');
+          if (lastCash && lastCash.month) {
+              const monthsArr = lastCash.month.split(',').map(m => m.trim());
               const lastMonth = monthsArr[monthsArr.length - 1]; 
               expiryDisplay = `End of ${lastMonth}`;
-          } else if (latestPayment.paid_on) {
-              const d = new Date(latestPayment.paid_on);
-              d.setDate(d.getDate() + 30);
-              expiryDisplay = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           }
       }
   }
 
-  // 🚀 NAYA JADOO: LIVE MATH ENGINE (Ab DB ke galat due par bharosa nahi)
+  // 🚀 LIVE MATH FIX
   const discountAmt = Number(student.extra_fees) || 0;
   const liveDue = Number(student.total_fees) - Number(student.paid_fees) - discountAmt;
 
-  // 📊 PURANA MONTH-WISE LOGIC (Flawless Math Fix ke sath)
+  // 📊 MONTH-WISE PASSBOOK ALGORITHM
   const ledgerMap = {};
   let totalBilledInHistory = 0; 
 
@@ -88,13 +86,17 @@ function StudentProfile() {
 
           monthsArr.forEach(m => {
               if (!ledgerMap[m]) {
-                  ledgerMap[m] = { monthName: m, billed: 0, paid: 0 };
+                  ledgerMap[m] = { monthName: m, billed: 0, paid: 0, discount: 0 };
               }
               if (item.status === 'Billed') {
                   ledgerMap[m].billed += amountPerMonth;
                   totalBilledInHistory += amountPerMonth; 
-              } else {
-                  ledgerMap[m].paid += amountPerMonth;
+              } else if (item.status === 'Paid') {
+                  if (item.mode === 'Discount') {
+                      ledgerMap[m].discount += amountPerMonth;
+                  } else {
+                      ledgerMap[m].paid += amountPerMonth;
+                  }
               }
           });
       });
@@ -173,7 +175,7 @@ function StudentProfile() {
 
                     {!student.has_active_plan && discountAmt > 0 && (
                     <div className="flex justify-between text-amber-400 text-xs">
-                        <span>Monthly Discount:</span> 
+                        <span>Total Discounts Given:</span> 
                         <span>- ₹{discountAmt}</span>
                     </div>
                     )}
@@ -207,7 +209,7 @@ function StudentProfile() {
             </div>
             </div>
 
-            {/* 📜 TABLE: PURANA PASSBOOK WITH DISCOUNT FIX */}
+            {/* 📜 TABLE: PASSBOOK (With Discount Column) */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 mb-10">
             <div className={`${student.has_active_plan ? 'bg-orange-500' : 'bg-indigo-700'} p-4 text-white font-black uppercase tracking-widest text-center text-sm`}>
                 📜 STATEMENT PASSBOOK
@@ -217,7 +219,8 @@ function StudentProfile() {
                 <tr>
                     <th className="p-4 border-b text-left pl-6">Month</th>
                     <th className="p-4 border-b text-center">Billed Fees</th>
-                    <th className="p-4 border-b text-center">Amount Paid</th>
+                    <th className="p-4 border-b text-center text-amber-600">Discount</th>
+                    <th className="p-4 border-b text-center text-green-600">Amount Paid</th>
                     <th className="p-4 border-b text-right pr-6">Balance Status</th>
                 </tr>
                 </thead>
@@ -227,16 +230,14 @@ function StudentProfile() {
                         <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
                             <td className="p-4 font-black text-indigo-900 text-xs text-left pl-6">{item.plan_name} <br/><span className="text-[9px] text-slate-400">{item.start_date}</span></td>
                             <td className="p-4 font-bold text-slate-600 text-sm">₹{item.price}</td>
+                            <td className="p-4 font-bold text-amber-500 text-xs">-</td>
                             <td className="p-4 font-black text-green-600 text-sm">₹{item.price}</td>
                             <td className="p-4 font-black text-xs text-right pr-6"><span className="bg-green-100 text-green-700 px-2 py-1 rounded">✅ Paid</span></td>
                         </tr>
-                     )) : <tr><td colSpan="4" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
+                     )) : <tr><td colSpan="5" className="p-10 text-slate-300 font-black italic">No history found.</td></tr>
                 ) : (
                     monthlyPassbook.length > 0 ? monthlyPassbook.map((row, idx) => {
-                        // 🚀 NAYA JADOO: First month ke balance mein discount minus karke dikhayega!
-                        const isFirstMonth = idx === monthlyPassbook.length - 1;
-                        const effectiveBilled = isFirstMonth ? (row.billed - discountAmt) : row.billed;
-                        const balance = effectiveBilled - row.paid; 
+                        const balance = row.billed - row.paid - row.discount; 
                         
                         return (
                         <tr key={idx} className="hover:bg-slate-50 transition-all border-b">
@@ -245,6 +246,9 @@ function StudentProfile() {
                             </td>
                             <td className="p-4 font-bold text-slate-600 text-sm">
                                 ₹{row.billed}
+                            </td>
+                            <td className="p-4 font-bold text-amber-500 text-xs">
+                                {row.discount > 0 ? `- ₹${row.discount}` : '-'}
                             </td>
                             <td className="p-4 font-black text-green-600 text-sm bg-green-50/20">
                                 ₹{row.paid}
@@ -267,7 +271,7 @@ function StudentProfile() {
                         </tr>
                         );
                     }) : (
-                        <tr><td colSpan="4" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No passbook history found.</td></tr>
+                        <tr><td colSpan="5" className="p-20 text-slate-300 font-black italic uppercase text-xs tracking-widest">No passbook history found.</td></tr>
                     )
                 )}
                 </tbody>
