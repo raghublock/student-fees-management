@@ -92,7 +92,7 @@ function Analytics() {
 
   // 2. STUDENT PROCESSING & EXPIRY CATEGORIZATION
   let totalGlobalDue = 0;
-  let dueGeneratedThisMonth = 0; // Due belonging to students whose cycle started/renewed this month
+  let dueGeneratedThisMonth = 0; 
 
   const expiry1to5 = [];
   const expiry6to10 = [];
@@ -124,7 +124,6 @@ function Analytics() {
               latestPayAmt = plan.price;
           }
       } else {
-          // Date-to-Date Logic for Regular Students
           const sortedF = [...studentFees].sort((a,b) => new Date(a.paid_on) - new Date(b.paid_on));
           if (sortedF.length > 0) {
               joinD = new Date(sortedF[0].paid_on);
@@ -148,7 +147,6 @@ function Analytics() {
               if (cyclesPassed === 0) cyclesPassed = 1;
               totalBilled = cyclesPassed * baseFee;
 
-              // Check if their current active cycle started this month, if so add to "Due this month"
               let currentCycleStart = new Date(joinD);
               currentCycleStart.setMonth(currentCycleStart.getMonth() + (cyclesPassed - 1));
               if (currentCycleStart.getMonth() === currentMonth && currentCycleStart.getFullYear() === currentYear && liveDue > 0) {
@@ -157,7 +155,6 @@ function Analytics() {
           }
       }
 
-      // Calculate Days Left
       let daysLeft = -999;
       let validTillStr = 'N/A';
       if (validTillD) {
@@ -180,7 +177,6 @@ function Analytics() {
 
       masterTableData.push(tableRow);
 
-      // Bucket Sorting for Expiries
       if (daysLeft >= 1 && daysLeft <= 5) expiry1to5.push(tableRow);
       else if (daysLeft >= 6 && daysLeft <= 10) expiry6to10.push(tableRow);
       else if (daysLeft >= 11 && daysLeft <= 15) expiry11to15.push(tableRow);
@@ -197,7 +193,7 @@ function Analytics() {
           <h1 className="text-3xl font-black text-indigo-900 tracking-tight">Library Analytics 📊</h1>
           <p className="text-gray-500 font-bold text-sm uppercase tracking-widest">Financials & Predictions</p>
         </div>
-        <Link to="/dashboard" className="bg-slate-200 text-slate-700 px-5 py-2 rounded-xl font-black hover:bg-slate-300 transition">← Back to Dashboard</Link>
+        <Link to="/dashboard" className="bg-slate-200 text-slate-700 px-5 py-2 rounded-xl font-black hover:bg-slate-300 transition">← Back</Link>
       </div>
 
       {/* TOP FINANCIAL KPI CARDS */}
@@ -224,52 +220,61 @@ function Analytics() {
         </div>
       </div>
 
-      {/* EXPIRY PREDICTION BOARDS */}
+      {/* EXPIRY PREDICTION BOARDS (Clickable & Fully Viewable) */}
       <div className="max-w-7xl mx-auto mb-8">
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest mb-4 border-l-4 border-indigo-500 pl-3">⏳ Upcoming Expiries (Renewals)</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
               
               {/* 1-5 Days */}
-              <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-red-100">
-                  <div className="bg-red-500 text-white p-3 text-center font-black uppercase text-xs tracking-widest">
+              <div className="bg-white rounded-2xl shadow-md border border-red-100">
+                  <div className="bg-red-500 text-white p-3 text-center font-black uppercase text-xs tracking-widest rounded-t-2xl">
                       Expires in 1 to 5 Days ({expiry1to5.length})
                   </div>
-                  <div className="p-2 max-h-64 overflow-y-auto">
+                  <div className="p-2">
                       {expiry1to5.length > 0 ? expiry1to5.map(s => (
-                          <div key={s.id} className="flex justify-between items-center p-2 hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                              <div><p className="font-bold text-sm text-slate-800">{s.name}</p><p className="text-[10px] text-red-500 font-black">{s.daysLeft} Days Left</p></div>
-                              <a href={`https://wa.me/91${s.whatsapp}?text=Namaste ${s.name}, Aapki library validity ${s.daysLeft} din mein khatam ho rahi hai. Kripya renew karwayein.`} target="_blank" rel="noreferrer" className="bg-green-100 text-green-600 px-2 py-1 rounded font-black text-[10px]">💬 Warn</a>
+                          <div key={s.id} className="flex justify-between items-center p-2 hover:bg-red-50 rounded-lg border-b border-slate-50 last:border-0 group">
+                              <Link to={`/student/${s.id}`} className="flex-1 cursor-pointer">
+                                  <p className="font-black text-sm text-slate-800 group-hover:text-red-600 transition-colors uppercase">{s.name}</p>
+                                  <p className="text-[10px] text-red-500 font-bold">⚠️ {s.daysLeft} Days Left</p>
+                              </Link>
+                              <a href={`https://wa.me/91${s.whatsapp}?text=Namaste ${s.name}, Aapki library validity ${s.daysLeft} din mein khatam ho rahi hai. Kripya renew karwayein.`} target="_blank" rel="noreferrer" className="bg-green-100 text-green-600 hover:bg-green-500 hover:text-white transition-all px-3 py-1.5 rounded-lg font-black text-[10px] uppercase shadow-sm">💬 Warn</a>
                           </div>
-                      )) : <p className="text-center text-xs font-bold text-slate-400 p-4">Koi student nahi hai.</p>}
+                      )) : <p className="text-center text-xs font-bold text-slate-400 p-4 uppercase tracking-widest">Clear List</p>}
                   </div>
               </div>
 
               {/* 6-10 Days */}
-              <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-orange-100">
-                  <div className="bg-orange-400 text-white p-3 text-center font-black uppercase text-xs tracking-widest">
+              <div className="bg-white rounded-2xl shadow-md border border-orange-100">
+                  <div className="bg-orange-400 text-white p-3 text-center font-black uppercase text-xs tracking-widest rounded-t-2xl">
                       Expires in 6 to 10 Days ({expiry6to10.length})
                   </div>
-                  <div className="p-2 max-h-64 overflow-y-auto">
+                  <div className="p-2">
                       {expiry6to10.length > 0 ? expiry6to10.map(s => (
-                          <div key={s.id} className="flex justify-between items-center p-2 hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                              <div><p className="font-bold text-sm text-slate-800">{s.name}</p><p className="text-[10px] text-orange-500 font-black">{s.daysLeft} Days Left</p></div>
-                              <a href={`https://wa.me/91${s.whatsapp}`} target="_blank" rel="noreferrer" className="bg-green-100 text-green-600 px-2 py-1 rounded font-black text-[10px]">💬 Warn</a>
+                          <div key={s.id} className="flex justify-between items-center p-2 hover:bg-orange-50 rounded-lg border-b border-slate-50 last:border-0 group">
+                              <Link to={`/student/${s.id}`} className="flex-1 cursor-pointer">
+                                  <p className="font-black text-sm text-slate-800 group-hover:text-orange-500 transition-colors uppercase">{s.name}</p>
+                                  <p className="text-[10px] text-orange-500 font-bold">⏳ {s.daysLeft} Days Left</p>
+                              </Link>
+                              <a href={`https://wa.me/91${s.whatsapp}`} target="_blank" rel="noreferrer" className="bg-green-100 text-green-600 hover:bg-green-500 hover:text-white transition-all px-3 py-1.5 rounded-lg font-black text-[10px] uppercase shadow-sm">💬 Msg</a>
                           </div>
-                      )) : <p className="text-center text-xs font-bold text-slate-400 p-4">Koi student nahi hai.</p>}
+                      )) : <p className="text-center text-xs font-bold text-slate-400 p-4 uppercase tracking-widest">Clear List</p>}
                   </div>
               </div>
 
               {/* 11-15 Days */}
-              <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-blue-100">
-                  <div className="bg-blue-500 text-white p-3 text-center font-black uppercase text-xs tracking-widest">
+              <div className="bg-white rounded-2xl shadow-md border border-blue-100">
+                  <div className="bg-blue-500 text-white p-3 text-center font-black uppercase text-xs tracking-widest rounded-t-2xl">
                       Expires in 11 to 15 Days ({expiry11to15.length})
                   </div>
-                  <div className="p-2 max-h-64 overflow-y-auto">
+                  <div className="p-2">
                       {expiry11to15.length > 0 ? expiry11to15.map(s => (
-                          <div key={s.id} className="flex justify-between items-center p-2 hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                              <div><p className="font-bold text-sm text-slate-800">{s.name}</p><p className="text-[10px] text-blue-500 font-black">{s.daysLeft} Days Left</p></div>
+                          <div key={s.id} className="flex justify-between items-center p-2 hover:bg-blue-50 rounded-lg border-b border-slate-50 last:border-0 group">
+                              <Link to={`/student/${s.id}`} className="flex-1 cursor-pointer">
+                                  <p className="font-black text-sm text-slate-800 group-hover:text-blue-600 transition-colors uppercase">{s.name}</p>
+                                  <p className="text-[10px] text-blue-500 font-bold">ℹ️ {s.daysLeft} Days Left</p>
+                              </Link>
                           </div>
-                      )) : <p className="text-center text-xs font-bold text-slate-400 p-4">Koi student nahi hai.</p>}
+                      )) : <p className="text-center text-xs font-bold text-slate-400 p-4 uppercase tracking-widest">Clear List</p>}
                   </div>
               </div>
 
@@ -299,7 +304,7 @@ function Analytics() {
                       {masterTableData.map(s => (
                           <tr key={s.id} className="hover:bg-indigo-50/30 transition-colors">
                               <td className="p-4">
-                                  <div className="font-black text-slate-800 text-sm uppercase">{s.name}</div>
+                                  <Link to={`/student/${s.id}`} className="font-black text-slate-800 text-sm uppercase hover:text-indigo-600 cursor-pointer">{s.name}</Link>
                                   <div className="text-[10px] font-bold text-slate-500">📞 {s.mobile}</div>
                               </td>
                               <td className="p-4">
